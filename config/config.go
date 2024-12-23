@@ -39,7 +39,8 @@ func LoadConfig() *Config {
 		TruecallerURL: 	   "https://truecaller-data2.p.rapidapi.com/search",
 		TruecallerAPIKey:  os.Getenv("TRUECALLER_API_KEY"),
 		TruecallerAPIHost: "truecaller-data2.p.rapidapi.com",
-	}}
+	}
+}
 
 func getEnv(key, defaultValue string) string {
     value := os.Getenv(key)
