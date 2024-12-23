@@ -60,8 +60,8 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
 
 func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, error) {
     reqBody := models.LeakosintRequest{
-        Token:   s.config.LeakosintAPIKey,
-        Request: query,
+        Token:   s.config.LeakosintAPIKey,  // dari .env
+        Request: query,                    // dari parameter
         Limit:   100,
         Lang:    "en",
     }
@@ -76,6 +76,7 @@ func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, er
         return nil, fmt.Errorf("error creating request: %v", err)
     }
 
+    // Hanya perlu content-type json
     req.Header.Set("Content-Type", "application/json")
 
     client := &http.Client{Timeout: time.Second * 10}
@@ -91,13 +92,16 @@ func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, er
     }
 
     var results []models.SearchResult
-    for source, sourceData := range leakosintResp.List {
-        for _, data := range sourceData.Data {
-            results = append(results, models.SearchResult{
-                Source:    source,
-                Data:     data,
-                Timestamp: time.Now(),
-            })
+    if leakosintResp.List != nil {
+        for source, sourceData := range leakosintResp.List {
+            for _, data := range sourceData.Data {
+                result := models.SearchResult{
+                    Source:    source,
+                    Data:     data,
+                    Timestamp: time.Now(),
+                }
+                results = append(results, result)
+            }
         }
     }
 

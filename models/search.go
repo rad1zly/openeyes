@@ -26,10 +26,10 @@ const (
 
 // Model untuk request ke Leakosint
 type LeakosintRequest struct {
-    Token   string `json:"token"`
-    Request string `json:"request"`
-    Limit   int    `json:"limit"`
-    Lang    string `json:"lang"`
+    Token   string `json:"token"`     // APIKEY
+    Request string `json:"request"`   // QUERY
+    Limit   int    `json:"limit"`     // 100
+    Lang    string `json:"lang"`      // "en"
 }
 
 type LeakosintSourceData struct {
