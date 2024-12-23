@@ -91,8 +91,8 @@ func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, er
     return results, nil
 }
 
-func (s *SearchService) queryLeakosintAPI(query string) (LeakosintResponse, error) {
-    reqBody := LeakosintRequest{
+func (s *SearchService) queryLeakosintAPI(query string) (models.LeakosintResponse, error) {
+    reqBody := models.LeakosintRequest{
         Token:   s.config.LeakosintAPIKey,
         Request: query,
         Limit:   100,
@@ -118,7 +118,7 @@ func (s *SearchService) queryLeakosintAPI(query string) (LeakosintResponse, erro
     }
     defer resp.Body.Close()
 
-    var apiResponse LeakosintResponse
+    var apiResponse modles.LeakosintResponse
     if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
         return nil, fmt.Errorf("error decoding response: %v", err)
     }
