@@ -118,7 +118,7 @@ func (s *SearchService) queryLeakosintAPI(query string) (models.LeakosintRespons
     }
     defer resp.Body.Close()
 
-    var apiResponse modles.LeakosintResponse
+    var apiResponse models.LeakosintResponse
     if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
         return nil, fmt.Errorf("error decoding response: %v", err)
     }
