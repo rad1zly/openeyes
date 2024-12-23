@@ -225,49 +225,66 @@ func (s *SearchService) searchTruecaller(query string) ([]models.SearchResult, e
 }
 
 func (s *SearchService) saveToElk(results []models.SearchResult, queryType models.QueryType) error {
-    cfg := elasticsearch.Config{
-        Addresses: []string{s.config.ElasticsearchURL},
-        Username:  s.config.ElasticsearchUser,     
-        Password:  s.config.ElasticsearchPassword,
-    }
+    // Buat basic auth transport
+    tr := &http.Transport{}
+    client := &http.Client{Transport: tr}
 
-    es, err := elasticsearch.NewClient(cfg)
-    if err != nil {
-        return fmt.Errorf("error creating elasticsearch client: %v", err)
-    }
-
-    var buf bytes.Buffer
+    // Siapkan bulk request
+    var bulkRequestBody strings.Builder
     for _, result := range results {
-        meta := map[string]interface{}{
+        // Action line
+        action := map[string]interface{}{
             "index": map[string]interface{}{
                 "_index": fmt.Sprintf("%s_data", queryType),
                 "_id":    generateID(result),
             },
         }
+        actionLine, _ := json.Marshal(action)
+        bulkRequestBody.WriteString(string(actionLine) + "\n")
 
-        if err := json.NewEncoder(&buf).Encode(meta); err != nil {
-            return fmt.Errorf("error encoding meta: %v", err)
-        }
-
-        if err := json.NewEncoder(&buf).Encode(result); err != nil {
-            return fmt.Errorf("error encoding document: %v", err)
-        }
+        // Document line
+        docLine, _ := json.Marshal(result)
+        bulkRequestBody.WriteString(string(docLine) + "\n")
     }
 
-    resp, err := es.Bulk(bytes.NewReader(buf.Bytes()))
+    // Buat request
+    req, err := http.NewRequest("POST", 
+        fmt.Sprintf("%s/_bulk", s.config.ElasticsearchURL), 
+        strings.NewReader(bulkRequestBody.String()))
     if err != nil {
-        return fmt.Errorf("error bulk saving to elasticsearch: %v", err)
+        log.Printf("Error creating request: %v", err)
+        return err
+    }
+
+    // Tambahkan headers
+    req.Header.Set("Content-Type", "application/x-ndjson")
+    req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
+
+    // Kirim request
+    resp, err := client.Do(req)
+    if err != nil {
+        log.Printf("Error sending request: %v", err)
+        return err
     }
     defer resp.Body.Close()
 
-    if resp.IsError() {
-        var raw map[string]interface{}
-        if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-            return fmt.Errorf("error parsing response body: %v", err)
-        }
-        return fmt.Errorf("error bulk saving: %v", raw)
+    // Baca response
+    body, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        log.Printf("Error reading response: %v", err)
+        return err
     }
 
+    // Log response untuk debugging
+    log.Printf("Elasticsearch response: %s", string(body))
+
+    // Check status code
+    if resp.StatusCode >= 400 {
+        return fmt.Errorf("elasticsearch returned status: %d, body: %s", 
+            resp.StatusCode, string(body))
+    }
+
+    log.Printf("Successfully saved %d documents to Elasticsearch", len(results))
     return nil
 }
 
