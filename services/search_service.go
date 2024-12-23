@@ -1,161 +1,281 @@
+// services/search_service.go
 package services
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"openeyes/config"
-	"openeyes/models"
-	"time"
-
-	"github.com/elastic/go-elasticsearch/v8"
+    "bytes"
+    "encoding/json"
+    "fmt"
+    "net/http"
+    "time"
+    "yourproject/models"
 )
 
 type SearchService struct {
-	es  *elasticsearch.Client
-	cfg *config.Config
+    config *config.Config
 }
 
-func NewSearchService(es *elasticsearch.Client, cfg *config.Config) *SearchService {
-	return &SearchService{
-		es:  es,
-		cfg: cfg,
-	}
+func NewSearchService(cfg *config.Config) *SearchService {
+    return &SearchService{
+        config: cfg,
+    }
 }
 
+// Fungsi utama Search
 func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
-	response := &models.SearchResponse{Query: query}
-	queryType := s.determineQueryType(query)
+    queryType := s.determineQueryType(query)
+    response := &models.SearchResponse{Query: query}
 
-	// Search in Elasticsearch first
-	elkResults, err := s.searchElk(query)
-	if err != nil {
-		return nil, err
-	}
+    switch queryType {
+    case "name":
+        leakosintResults, _ := s.searchLeakosint(query)
+        linkedinResults, _ := s.searchLinkedin(query)
+            
+        response.LeakosintResults.Results = leakosintResults
+        response.LinkedinResults.Results = linkedinResults
 
-	response.ElkResults.Results = elkResults
-	response.ElkResults.Total = len(elkResults)
+    case "nik":
+        leakosintResults, _ := s.searchLeakosint(query)
+        response.LeakosintResults.Results = leakosintResults
 
-	// If no results in Elasticsearch, search in external APIs
-	if len(elkResults) == 0 {
-		switch queryType {
-		case "name":
-			leakosintResults, _ := s.searchLeakosint(query)
-			linkedinResults, _ := s.searchLinkedin(query)
+    case "phone":
+        leakosintResults, _ := s.searchLeakosint(query)
+        truecallerResults, _ := s.searchTruecaller(query)
+        
+        response.LeakosintResults.Results = leakosintResults
+        response.TruecallerResults.Results = truecallerResults
+    }
 
-			response.LeakosintResults.Results = leakosintResults
-			response.LeakosintResults.Total = len(leakosintResults)
-
-			response.LinkedinResults.Results = linkedinResults
-			response.LinkedinResults.Total = len(linkedinResults)
-
-		case "nik":
-			leakosintResults, _ := s.searchLeakosint(query)
-			response.LeakosintResults.Results = leakosintResults
-			response.LeakosintResults.Total = len(leakosintResults)
-
-		case "phone":
-			leakosintResults, _ := s.searchLeakosint(query)
-			truecallerResults, _ := s.searchTruecaller(query)
-
-			response.LeakosintResults.Results = leakosintResults
-			response.LeakosintResults.Total = len(leakosintResults)
-
-			response.TruecallerResults.Results = truecallerResults
-			response.TruecallerResults.Total = len(truecallerResults)
-		}
-	}
-
-	return response, nil
+    return response, nil
 }
 
-func (s *SearchService) determineQueryType(query string) string {
-	if isNIK(query) {
-		return "nik"
-	}
-	if isPhone(query) {
-		return "phone"
-	}
-	return "name"
-}
-
-func (s *SearchService) searchElk(query string) ([]models.SearchResult, error) {
-	ctx := context.Background()
-
-	searchQuery := map[string]interface{}{
-		"query": map[string]interface{}{
-			"multi_match": map[string]interface{}{
-				"query":  query,
-				"fields": []string{"title", "content", "name", "phone", "nik"},
-			},
-		},
-	}
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(searchQuery); err != nil {
-		return nil, err
-	}
-
-	res, err := s.es.Search(
-		s.es.Search.WithContext(ctx),
-		s.es.Search.WithIndex("search_index"),
-		s.es.Search.WithBody(&buf),
-		s.es.Search.WithTrackTotalHits(true),
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	var result map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-
-	var searchResults []models.SearchResult
-	hits := result["hits"].(map[string]interface{})["hits"].([]interface{})
-
-	for _, hit := range hits {
-		hitMap := hit.(map[string]interface{})
-		source := hitMap["_source"].(map[string]interface{})
-
-		searchResults = append(searchResults, models.SearchResult{
-			ID:        hitMap["_id"].(string),
-			Source:    "elk",
-			Data:      source,
-			Timestamp: time.Now(),
-		})
-	}
-
-	return searchResults, nil
-}
-
+// Implementasi searchLeakosint
 func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, error) {
-	// Implement Leakosint API integration
-	// This is a placeholder implementation
-	return []models.SearchResult{}, nil
+    reqBody := models.LeakosintRequest{
+        Token:   s.config.LeakosintAPIKey,
+        Request: query,
+        Limit:   100,
+        Lang:    "en",
+    }
+
+    jsonData, err := json.Marshal(reqBody)
+    if err != nil {
+        return nil, fmt.Errorf("error marshaling request: %v", err)
+    }
+
+    req, err := http.NewRequest("POST", "https://leakosintapi.com/", bytes.NewBuffer(jsonData))
+    if err != nil {
+        return nil, fmt.Errorf("error creating request: %v", err)
+    }
+
+    req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{Timeout: time.Second * 10}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("error making request: %v", err)
+    }
+    defer resp.Body.Close()
+
+    var leakosintResp models.LeakosintResponse
+    if err := json.NewDecoder(resp.Body).Decode(&leakosintResp); err != nil {
+        return nil, fmt.Errorf("error decoding response: %v", err)
+    }
+
+    var results []models.SearchResult
+    for source, sourceData := range leakosintResp.List {
+        for _, data := range sourceData.Data {
+            result := models.SearchResult{
+                Source:    source,
+                Data:     data,
+                Timestamp: time.Now(),
+            }
+            results = append(results, result)
+        }
+    }
+
+    // Save to ELK
+    if err := s.saveToElk(results, queryType); err != nil {
+        fmt.Printf("Error saving to ELK: %v\n", err)
+    }
+
+    return results, nil
 }
 
-func (s *SearchService) searchLinkedin(query string) ([]models.SearchResult, error) {
-	// Implement LinkedIn API integration
-	// This is a placeholder implementation
-	return []models.SearchResult{}, nil
-}
-
-func (s *SearchService) searchTruecaller(query string) ([]models.SearchResult, error) {
-	// Implement Truecaller API integration
-	// This is a placeholder implementation
-	return []models.SearchResult{}, nil
+// Helper functions
+func (s *SearchService) determineQueryType(query string) string {
+    if isNIK(query) {
+        return "nik"
+    }
+    if isPhone(query) {
+        return "phone"
+    }
+    return "name"
 }
 
 func isNIK(query string) bool {
-	// Implement NIK validation
-	// Example: check if string is 16 digits
-	return len(query) == 16
+    return len(query) == 16
 }
 
 func isPhone(query string) bool {
-	// Implement phone number validation
-	// Example: check if string starts with country code
-	return len(query) >= 10 && query[0] == '6'
+    return len(query) >= 10 && query[0] == '6'
+}
+
+// Placeholder functions untuk API lain (akan diimplementasi nanti)
+func (s *SearchService) searchLinkedin(query string) ([]models.SearchResult, error) {
+    reqBody := models.LinkedInRequest{
+        Name:        query,
+        CompanyName: "",
+        JobTitle:    "",
+        Location:    "",
+        Keywords:    "",
+        Limit:       5,
+    }
+
+    jsonData, err := json.Marshal(reqBody)
+    if err != nil {
+        return nil, fmt.Errorf("error marshaling request: %v", err)
+    }
+
+    req, err := http.NewRequest("POST", 
+        "https://fresh-linkedin-profile-data.p.rapidapi.com/google-full-profiles", 
+        bytes.NewBuffer(jsonData))
+    if err != nil {
+        return nil, fmt.Errorf("error creating request: %v", err)
+    }
+
+    req.Header.Add("x-rapidapi-key", s.config.LinkedinAPIKey)
+    req.Header.Add("x-rapidapi-host", "fresh-linkedin-profile-data.p.rapidapi.com")
+    req.Header.Add("Content-Type", "application/json")
+
+    client := &http.Client{Timeout: time.Second * 10}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("error making request: %v", err)
+    }
+    defer resp.Body.Close()
+
+    var profiles []models.LinkedInProfile
+    if err := json.NewDecoder(resp.Body).Decode(&profiles); err != nil {
+        return nil, fmt.Errorf("error decoding response: %v", err)
+    }
+
+    var results []models.SearchResult
+    for _, profile := range profiles {
+        result := models.SearchResult{
+            Source:    "linkedin",
+            Data:     profile,
+            Timestamp: time.Now(),
+        }
+        results = append(results, result)
+
+        // Save to ELK
+        if err := s.saveToElk([]models.SearchResult{result}, "name"); err != nil {
+            fmt.Printf("Error saving to ELK: %v\n", err)
+        }
+    }
+
+    return results, nil
+}
+
+func (s *SearchService) searchTruecaller(query string) ([]models.SearchResult, error) {
+    url := fmt.Sprintf("https://truecaller-data2.p.rapidapi.com/search/%s", query)
+    
+    req, err := http.NewRequest("GET", url, nil)
+    if err != nil {
+        return nil, fmt.Errorf("error creating request: %v", err)
+    }
+
+    // Add headers
+    req.Header.Add("x-rapidapi-key", s.config.TruecallerAPIKey)
+    req.Header.Add("x-rapidapi-host", "truecaller-data2.p.rapidapi.com")
+
+    client := &http.Client{Timeout: time.Second * 10}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("error making request: %v", err)
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK {
+        return nil, fmt.Errorf("truecaller API returned status: %d", resp.StatusCode)
+    }
+
+    var truecallerResp models.TruecallerResponse
+    if err := json.NewDecoder(resp.Body).Decode(&truecallerResp); err != nil {
+        return nil, fmt.Errorf("error decoding response: %v", err)
+    }
+
+    // Convert to SearchResult format
+    result := models.SearchResult{
+        Source:    "truecaller",
+        Data:     truecallerResp.Data,
+        Timestamp: time.Now(),
+    }
+
+    // Save to ELK
+    if err := s.saveToElk([]models.SearchResult{result}, "phone"); err != nil {
+        fmt.Printf("Error saving to ELK: %v\n", err)
+    }
+
+    return []models.SearchResult{result}, nil
+}
+
+func (s *SearchService) saveToElk(results []models.SearchResult, queryType string) error {
+    // Setup Elasticsearch client
+    es, err := elasticsearch.NewClient(elasticsearch.Config{
+        Addresses: []string{s.config.ElasticsearchURL},
+        Username:  s.config.ElasticsearchUser,     
+        Password:  s.config.ElasticsearchPassword,
+    })
+    if err != nil {
+        return fmt.Errorf("error creating elasticsearch client: %v", err)
+    }
+
+    // Bulk save ke Elasticsearch
+    var buf bytes.Buffer
+    for _, result := range results {
+        // Header untuk bulk operation
+        meta := map[string]interface{}{
+            "index": map[string]interface{}{
+                "_index": fmt.Sprintf("%s_data", queryType), // misal: name_data, nik_data, phone_data
+                "_id":    generateID(result), // Bisa menggunakan kombinasi source dan timestamp
+            },
+        }
+
+        // Tambahkan metadata
+        if err := json.NewEncoder(&buf).Encode(meta); err != nil {
+            return fmt.Errorf("error encoding meta: %v", err)
+        }
+
+        // Tambahkan document
+        if err := json.NewEncoder(&buf).Encode(result); err != nil {
+            return fmt.Errorf("error encoding document: %v", err)
+        }
+    }
+
+    // Kirim bulk request ke Elasticsearch
+    resp, err := es.Bulk(bytes.NewReader(buf.Bytes()))
+    if err != nil {
+        return fmt.Errorf("error bulk saving to elasticsearch: %v", err)
+    }
+    defer resp.Body.Close()
+
+    // Check response
+    if resp.IsError() {
+        var raw map[string]interface{}
+        if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+            return fmt.Errorf("error parsing response body: %v", err)
+        }
+        return fmt.Errorf("error bulk saving: %v", raw)
+    }
+
+    return nil
+}
+
+// Helper function untuk generate ID
+func generateID(result models.SearchResult) string {
+    // Bisa menggunakan hash dari kombinasi data untuk memastikan uniqueness
+    h := sha256.New()
+    h.Write([]byte(fmt.Sprintf("%s-%v-%s", result.Source, result.Data, result.Timestamp.String())))
+    return hex.EncodeToString(h.Sum(nil))
 }

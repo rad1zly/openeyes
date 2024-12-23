@@ -9,6 +9,8 @@ type Config struct {
 	LeakosintAPIKey  string
 	LinkedinAPIKey   string
 	TruecallerAPIKey string
+    TruecallerAPIHost  string
+}
 }
 
 func LoadConfig() *Config {
@@ -17,6 +19,8 @@ func LoadConfig() *Config {
 		LeakosintAPIKey:  getEnv("LEAKOSINT_API_KEY", ""),
 		LinkedinAPIKey:   getEnv("LINKEDIN_API_KEY", ""),
 		TruecallerAPIKey: getEnv("TRUECALLER_API_KEY", ""),
+		TruecallerAPIKey:  getEnv("TRUECALLER_API_KEY", ""),
+        TruecallerAPIHost: getEnv("TRUECALLER_API_HOST", "truecaller-data2.p.rapidapi.com"),
 	}
 }
 
