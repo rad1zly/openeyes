@@ -7,7 +7,11 @@ import (
     "fmt"
     "net/http"
     "time"
-    "yourproject/models"
+    "openeyes/models"
+	"crypto/sha256"
+	"encoding/hex"
+	"openeyes/config"
+	"github.com/elastic/go-elasticsearch/v8"
 )
 
 type SearchService struct {
