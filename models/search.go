@@ -28,3 +28,11 @@ type SearchResponse struct {
 		Results []SearchResult `json:"results"`
 	} `json:"truecaller_results,omitempty"`
 }
+
+type QueryType string
+
+const (
+    QueryTypeName  QueryType = "name"
+    QueryTypeNIK   QueryType = "nik"
+    QueryTypePhone QueryType = "phone"
+)

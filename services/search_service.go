@@ -98,22 +98,22 @@ func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, er
     }
 
     // Save to ELK
-    if err := s.saveToElk(results, queryType); err != nil {
-        fmt.Printf("Error saving to ELK: %v\n", err)
-    }
+    if err := s.saveToElk(results, s.determineQueryType(query)); err != nil {
+		fmt.Printf("Error saving to ELK: %v\n", err)
+	}
 
     return results, nil
 }
 
 // Helper functions
-func (s *SearchService) determineQueryType(query string) string {
+func (s *SearchService) determineQueryType(query string) models.QueryType {
     if isNIK(query) {
-        return "nik"
+        return models.QueryTypeNIK
     }
     if isPhone(query) {
-        return "phone"
+        return models.QueryTypePhone
     }
-    return "name"
+    return models.QueryTypeName
 }
 
 func isNIK(query string) bool {
@@ -173,9 +173,9 @@ func (s *SearchService) searchLinkedin(query string) ([]models.SearchResult, err
         results = append(results, result)
 
         // Save to ELK
-        if err := s.saveToElk([]models.SearchResult{result}, "name"); err != nil {
-            fmt.Printf("Error saving to ELK: %v\n", err)
-        }
+        if err := s.saveToElk([]models.SearchResult{result}, models.QueryTypeName); err != nil {
+			fmt.Printf("Error saving to ELK: %v\n", err)
+		}
     }
 
     return results, nil
@@ -217,15 +217,14 @@ func (s *SearchService) searchTruecaller(query string) ([]models.SearchResult, e
     }
 
     // Save to ELK
-    if err := s.saveToElk([]models.SearchResult{result}, "phone"); err != nil {
-        fmt.Printf("Error saving to ELK: %v\n", err)
-    }
+    if err := s.saveToElk([]models.SearchResult{result}, models.QueryTypePhone); err != nil {
+		fmt.Printf("Error saving to ELK: %v\n", err)
+	}
 
     return []models.SearchResult{result}, nil
 }
 
-func (s *SearchService) saveToElk(results []models.SearchResult, queryType string) error {
-    // Setup Elasticsearch client
+func (s *SearchService) saveToElk(results []models.SearchResult, queryType models.QueryType) error {
     es, err := elasticsearch.NewClient(elasticsearch.Config{
         Addresses: []string{s.config.ElasticsearchURL},
         Username:  s.config.ElasticsearchUser,     
@@ -235,36 +234,30 @@ func (s *SearchService) saveToElk(results []models.SearchResult, queryType strin
         return fmt.Errorf("error creating elasticsearch client: %v", err)
     }
 
-    // Bulk save ke Elasticsearch
     var buf bytes.Buffer
     for _, result := range results {
-        // Header untuk bulk operation
         meta := map[string]interface{}{
             "index": map[string]interface{}{
-                "_index": fmt.Sprintf("%s_data", queryType), // misal: name_data, nik_data, phone_data
-                "_id":    generateID(result), // Bisa menggunakan kombinasi source dan timestamp
+                "_index": fmt.Sprintf("%s_data", queryType),
+                "_id":    generateID(result),
             },
         }
 
-        // Tambahkan metadata
         if err := json.NewEncoder(&buf).Encode(meta); err != nil {
             return fmt.Errorf("error encoding meta: %v", err)
         }
 
-        // Tambahkan document
         if err := json.NewEncoder(&buf).Encode(result); err != nil {
             return fmt.Errorf("error encoding document: %v", err)
         }
     }
 
-    // Kirim bulk request ke Elasticsearch
     resp, err := es.Bulk(bytes.NewReader(buf.Bytes()))
     if err != nil {
         return fmt.Errorf("error bulk saving to elasticsearch: %v", err)
     }
     defer resp.Body.Close()
 
-    // Check response
     if resp.IsError() {
         var raw map[string]interface{}
         if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {

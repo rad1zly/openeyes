@@ -1,4 +1,4 @@
-module yourproject
+module openeyes
 
 go 1.21
 
