@@ -78,31 +78,28 @@ func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, er
     }
 
     jsonData, _ := json.Marshal(data)
-    fmt.Printf("Request: %s\n", string(jsonData))
-
     req, _ := http.NewRequest("POST", s.config.LeakosintURL, bytes.NewBuffer(jsonData))
     req.Header.Set("Content-Type", "application/json")
 
     client := &http.Client{}
     resp, err := client.Do(req)
     if err != nil {
-        fmt.Printf("Error: %v\n", err)
         return nil, err
     }
     defer resp.Body.Close()
 
-    body, _ := ioutil.ReadAll(resp.Body)
-    fmt.Printf("Response: %s\n", string(body))
-
     var result models.LeakosintResponse
-    json.Unmarshal(body, &result)
+    json.NewDecoder(resp.Body).Decode(&result)
 
     var results []models.SearchResult
     for source, sourceData := range result.List {
         for _, data := range sourceData.Data {
+            id := fmt.Sprintf("%s_%d", source, time.Now().UnixNano())
             results = append(results, models.SearchResult{
-                Source: source,
-                Data:   data,
+                ID:        id,
+                Source:    source,
+                Data:     data,
+                Timestamp: time.Now(),
             })
         }
     }
