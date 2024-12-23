@@ -7,8 +7,8 @@ import (
     "fmt"
     "net/http"
     "time"
-    "yourproject/config"
-    "yourproject/models"
+    "openeyes/config"
+    "openeyes/models"
 )
 
 type SearchService struct {
