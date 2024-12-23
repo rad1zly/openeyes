@@ -32,19 +32,17 @@ type LeakosintRequest struct {
     Lang    string `json:"lang"`      // "en"
 }
 
-type LeakosintSourceData struct {
-    Data         []interface{} `json:"Data"`
-    NumOfResults int          `json:"NumOfResults"`
-    InfoLeak     string       `json:"InfoLeak"`
-}
-
 type LeakosintResponse struct {
-    NumOfResults    int                           `json:"NumOfResults"`
-    List            map[string]LeakosintSourceData `json:"List"`
-    NumOfDatabase   int                           `json:"NumOfDatabase"`
-    SearchTime      float64                       `json:"search time"`
-    Price           int                           `json:"price"`
-    FreeRequestsLeft int                          `json:"free_requests_left"`
+    NumOfResults    int `json:"NumOfResults"`
+    List            map[string]struct {
+        Data         []interface{} `json:"Data"`
+        NumOfResults int          `json:"NumOfResults"`
+        InfoLeak     string       `json:"InfoLeak"`
+    } `json:"List"`
+    NumOfDatabase    int     `json:"NumOfDatabase"`
+    SearchTime       float64 `json:"search time"`
+    Price            int     `json:"price"`
+    FreeRequestsLeft int    `json:"free_requests_left"`
 }
 
 // Model untuk request ke LinkedIn
@@ -70,6 +68,7 @@ type LinkedInProfile struct {
     ProfileImageURL string `json:"profile_image_url"`
     ProfileURL 		string `json:"linkedin_url"`
 	Educations		[]interface{} `json:"educations"`
+    PublicID        string  `json:"public_id"`
 	// ... tambahkan field lain sesuai kebutuhan
 }
 
