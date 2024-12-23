@@ -39,7 +39,7 @@ type LeakosintSourceData struct {
 }
 
 type LeakosintResponse struct {
-    NumOfResults     int                           `json:"NumOfResults"`
+    NumOfResults    int                           `json:"NumOfResults"`
     List            map[string]LeakosintSourceData `json:"List"`
     NumOfDatabase   int                           `json:"NumOfDatabase"`
     SearchTime      float64                       `json:"search time"`
@@ -63,9 +63,14 @@ type LinkedInProfile struct {
     FirstName       string `json:"first_name"`
     LastName        string `json:"last_name"`
     Headline        string `json:"headline"`
+	CompanyName		string `json:"company"`
+	CompanyLogo		string `json:"company_logo_url`
+	JobTitle  		string `json:"job_title`
     Location        string `json:"location"`
     ProfileImageURL string `json:"profile_image_url"`
-    // ... tambahkan field lain sesuai kebutuhan
+    ProfileURL 		string `json:"linkedin_url"`
+	Educations		[]interface{} `json:"educations"`
+	// ... tambahkan field lain sesuai kebutuhan
 }
 
 // Model untuk response Truecaller
