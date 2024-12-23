@@ -5,7 +5,7 @@ import (
     "bytes"
     "encoding/json"
     "fmt"
-	"io/ioutil"
+	//"io/ioutil"
     "net/http"
     "time"
     "openeyes/config"
@@ -70,46 +70,60 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
 }
 
 func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, error) {
-    data := map[string]interface{}{
-        "token":   s.config.LeakosintAPIKey,
-        "request": query,
-        "limit":   100,
-        "lang":    "en",
+    apiResponse, err := s.queryLeakosintAPI(query)
+    if err != nil {
+        return nil, err
     }
 
-    jsonData, _ := json.Marshal(data)
-    req, _ := http.NewRequest("POST", s.config.LeakosintURL, bytes.NewBuffer(jsonData))
+    var results []models.SearchResult
+    if list, ok := apiResponse["List"].(map[string]interface{}); ok {
+        for source, sourceData := range list {
+            result := models.SearchResult{
+                ID:        fmt.Sprintf("%s_%d", source, time.Now().UnixNano()),
+                Source:    source,
+                Data:      sourceData,
+                Timestamp: time.Now(),
+            }
+            results = append(results, result)
+        }
+    }
+
+    return results, nil
+}
+
+func (s *SearchService) queryLeakosintAPI(query string) (LeakosintResponse, error) {
+    reqBody := LeakosintRequest{
+        Token:   s.config.LeakosintAPIKey,
+        Request: query,
+        Limit:   100,
+        Lang:    "en",
+    }
+
+    jsonData, err := json.Marshal(reqBody)
+    if err != nil {
+        return nil, fmt.Errorf("error marshaling request: %v", err)
+    }
+
+    req, err := http.NewRequest("POST", s.config.LeakosintURL, bytes.NewBuffer(jsonData))
+    if err != nil {
+        return nil, fmt.Errorf("error creating request: %v", err)
+    }
+
     req.Header.Set("Content-Type", "application/json")
 
     client := &http.Client{}
     resp, err := client.Do(req)
     if err != nil {
-        return nil, err
+        return nil, fmt.Errorf("error making request: %v", err)
     }
     defer resp.Body.Close()
 
-    var result models.LeakosintResponse
-    json.NewDecoder(resp.Body).Decode(&result)
-
-    var results []models.SearchResult
-    if list, ok := result["List"].(map[string]interface{}); ok {
-        for source, sourceData := range list {
-            if data, ok := sourceData.(map[string]interface{}); ok {
-                if items, ok := data["Data"].([]interface{}); ok {
-                    for _, item := range items {
-                        results = append(results, models.SearchResult{
-                            ID:        fmt.Sprintf("%s_%d", source, time.Now().UnixNano()),
-                            Source:    source,
-                            Data:      item,
-                            Timestamp: time.Now(),
-                        })
-                    }
-                }
-            }
-        }
+    var apiResponse LeakosintResponse
+    if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
+        return nil, fmt.Errorf("error decoding response: %v", err)
     }
 
-    return results, nil
+    return apiResponse, nil
 }
 
 func (s *SearchService) searchLinkedin(query string) ([]models.SearchResult, error) {
