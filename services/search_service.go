@@ -25,51 +25,26 @@ func NewSearchService(cfg *config.Config) *SearchService {
 func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
     response := &models.SearchResponse{Query: query}
 
-    // Untuk kasus pencarian nama, cari di Leakosint dan LinkedIn
+    // Untuk pencarian nama
     if !isNIK(query) && !isPhone(query) {
-        // Cari di kedua API secara parallel
-        leakosintChan := make(chan []models.SearchResult)
-        linkedinChan := make(chan []models.SearchResult)
-
-        go func() {
-            results, _ := s.searchLeakosint(query)
-            leakosintChan <- results
-        }()
-
-        go func() {
-            results, _ := s.searchLinkedin(query)
-            linkedinChan <- results
-        }()
-
-        response.LeakosintResults = <-leakosintChan
-        response.LinkedinResults = <-linkedinChan
-
-        return response, nil
-    }
-
-    // Untuk kasus pencarian NIK
-    if isNIK(query) {
-        leakosintResults, err := s.searchLeakosint(query)
-        if err == nil && len(leakosintResults) > 0 {
-            response.LeakosintResults = leakosintResults
+        leakResults, _ := s.searchLeakosint(query)
+        response.LeakosintResults = leakResults
+        
+        linkResults, _ := s.searchLinkedin(query)
+        if linkResults != nil && len(linkResults) > 0 {
+            response.LinkedinResults = linkResults
         }
-        return response, nil
-    }
-
-    // Untuk kasus pencarian nomor telepon
-    if isPhone(query) {
-        // Cari di Leakosint
-        leakosintResults, err := s.searchLeakosint(query)
-        if err == nil && len(leakosintResults) > 0 {
-            response.LeakosintResults = leakosintResults
+    } else if isNIK(query) {
+        leakResults, _ := s.searchLeakosint(query)
+        response.LeakosintResults = leakResults
+    } else if isPhone(query) {
+        leakResults, _ := s.searchLeakosint(query)
+        response.LeakosintResults = leakResults
+        
+        trueResults, _ := s.searchTruecaller(query)
+        if trueResults != nil && len(trueResults) > 0 {
+            response.TruecallerResults = trueResults
         }
-
-        // Cari di Truecaller
-        truecallerResults, err := s.searchTruecaller(query)
-        if err == nil && len(truecallerResults) > 0 {
-            response.TruecallerResults = truecallerResults
-        }
-        return response, nil
     }
 
     return response, nil
