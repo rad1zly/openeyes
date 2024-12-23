@@ -92,15 +92,20 @@ func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, er
     json.NewDecoder(resp.Body).Decode(&result)
 
     var results []models.SearchResult
-    for source, sourceData := range result.List {
-        for _, data := range sourceData.Data {
-            id := fmt.Sprintf("%s_%d", source, time.Now().UnixNano())
-            results = append(results, models.SearchResult{
-                ID:        id,
-                Source:    source,
-                Data:     data,
-                Timestamp: time.Now(),
-            })
+    if list, ok := result["List"].(map[string]interface{}); ok {
+        for source, sourceData := range list {
+            if data, ok := sourceData.(map[string]interface{}); ok {
+                if items, ok := data["Data"].([]interface{}); ok {
+                    for _, item := range items {
+                        results = append(results, models.SearchResult{
+                            ID:        fmt.Sprintf("%s_%d", source, time.Now().UnixNano()),
+                            Source:    source,
+                            Data:      item,
+                            Timestamp: time.Now(),
+                        })
+                    }
+                }
+            }
         }
     }
 
