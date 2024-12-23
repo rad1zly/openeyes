@@ -27,17 +27,23 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
 
     // Untuk kasus pencarian nama, cari di Leakosint dan LinkedIn
     if !isNIK(query) && !isPhone(query) {
-        // Cari di Leakosint
-        leakosintResults, err := s.searchLeakosint(query)
-        if err == nil && len(leakosintResults) > 0 {
-            response.LeakosintResults = leakosintResults
-        }
+        // Cari di kedua API secara parallel
+        leakosintChan := make(chan []models.SearchResult)
+        linkedinChan := make(chan []models.SearchResult)
 
-        // Cari di LinkedIn
-        linkedinResults, err := s.searchLinkedin(query)
-        if err == nil && len(linkedinResults) > 0 {
-            response.LinkedinResults = linkedinResults
-        }
+        go func() {
+            results, _ := s.searchLeakosint(query)
+            leakosintChan <- results
+        }()
+
+        go func() {
+            results, _ := s.searchLinkedin(query)
+            linkedinChan <- results
+        }()
+
+        response.LeakosintResults = <-leakosintChan
+        response.LinkedinResults = <-linkedinChan
+
         return response, nil
     }
 
