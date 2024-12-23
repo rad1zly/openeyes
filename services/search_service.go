@@ -225,11 +225,13 @@ func (s *SearchService) searchTruecaller(query string) ([]models.SearchResult, e
 }
 
 func (s *SearchService) saveToElk(results []models.SearchResult, queryType models.QueryType) error {
-    es, err := elasticsearch.NewClient(elasticsearch.Config{
+    cfg := elasticsearch.Config{
         Addresses: []string{s.config.ElasticsearchURL},
         Username:  s.config.ElasticsearchUser,     
         Password:  s.config.ElasticsearchPassword,
-    })
+    }
+
+    es, err := elasticsearch.NewClient(cfg)
     if err != nil {
         return fmt.Errorf("error creating elasticsearch client: %v", err)
     }
