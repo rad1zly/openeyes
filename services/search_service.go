@@ -22,37 +22,47 @@ func NewSearchService(cfg *config.Config) *SearchService {
 }
 
 func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
-    queryType := s.determineQueryType(query)
     response := &models.SearchResponse{Query: query}
 
-    switch queryType {
-    case "name":
+    // Untuk kasus pencarian nama, cari di Leakosint dan LinkedIn
+    if !isNIK(query) && !isPhone(query) {
+        // Cari di Leakosint
         leakosintResults, err := s.searchLeakosint(query)
-        if err == nil {
+        if err == nil && len(leakosintResults) > 0 {
             response.LeakosintResults = leakosintResults
         }
-        
+
+        // Cari di LinkedIn
         linkedinResults, err := s.searchLinkedin(query)
-        if err == nil {
+        if err == nil && len(linkedinResults) > 0 {
             response.LinkedinResults = linkedinResults
         }
+        return response, nil
+    }
 
-    case "nik":
+    // Untuk kasus pencarian NIK
+    if isNIK(query) {
         leakosintResults, err := s.searchLeakosint(query)
-        if err == nil {
+        if err == nil && len(leakosintResults) > 0 {
+            response.LeakosintResults = leakosintResults
+        }
+        return response, nil
+    }
+
+    // Untuk kasus pencarian nomor telepon
+    if isPhone(query) {
+        // Cari di Leakosint
+        leakosintResults, err := s.searchLeakosint(query)
+        if err == nil && len(leakosintResults) > 0 {
             response.LeakosintResults = leakosintResults
         }
 
-    case "phone":
-        leakosintResults, err := s.searchLeakosint(query)
-        if err == nil {
-            response.LeakosintResults = leakosintResults
-        }
-        
+        // Cari di Truecaller
         truecallerResults, err := s.searchTruecaller(query)
-        if err == nil {
+        if err == nil && len(truecallerResults) > 0 {
             response.TruecallerResults = truecallerResults
         }
+        return response, nil
     }
 
     return response, nil
