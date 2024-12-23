@@ -116,26 +116,32 @@ func (s *SearchService) searchLinkedin(query string) ([]models.SearchResult, err
         "keywords": "",
         "limit": 15,
     }
-
+ 
     jsonData, _ := json.Marshal(data)
+    fmt.Printf("LinkedIn Request: %s\n", string(jsonData))
+ 
     req, _ := http.NewRequest("POST", s.config.LinkedinURL, bytes.NewBuffer(jsonData))
-
     req.Header.Set("Content-Type", "application/json")
     req.Header.Set("x-rapidapi-key", s.config.LinkedinAPIKey)
     req.Header.Set("x-rapidapi-host", s.config.LinkedinAPIHost)
-
+ 
     client := &http.Client{}
     resp, err := client.Do(req)
     if err != nil {
+        fmt.Printf("LinkedIn Error: %v\n", err)
         return nil, err
     }
     defer resp.Body.Close()
-
+ 
+    body, _ := ioutil.ReadAll(resp.Body)
+    fmt.Printf("LinkedIn Response: %s\n", string(body))
+ 
     var apiResponse []interface{}
-    if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
+    if err := json.Unmarshal(body, &apiResponse); err != nil {
+        fmt.Printf("LinkedIn Parse Error: %v\n", err)
         return nil, err
     }
-
+ 
     var results []models.SearchResult
     for _, data := range apiResponse {
         results = append(results, models.SearchResult{
@@ -145,9 +151,9 @@ func (s *SearchService) searchLinkedin(query string) ([]models.SearchResult, err
             Timestamp: time.Now(),
         })
     }
-
+ 
     return results, nil
-}
+ }
 
 func (s *SearchService) searchTruecaller(query string) ([]models.SearchResult, error) {
     url := fmt.Sprintf("%s/%s", s.config.TruecallerURL, query)
