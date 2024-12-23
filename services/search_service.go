@@ -27,22 +27,32 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
 
     switch queryType {
     case "name":
-        leakosintResults, _ := s.searchLeakosint(query)
-        linkedinResults, _ := s.searchLinkedin(query)
+        leakosintResults, err := s.searchLeakosint(query)
+        if err == nil {
+            response.LeakosintResults = leakosintResults
+        }
         
-        response.LeakosintResults.Results = leakosintResults
-        response.LinkedinResults.Results = linkedinResults
+        linkedinResults, err := s.searchLinkedin(query)
+        if err == nil {
+            response.LinkedinResults = linkedinResults
+        }
 
     case "nik":
-        leakosintResults, _ := s.searchLeakosint(query)
-        response.LeakosintResults.Results = leakosintResults
+        leakosintResults, err := s.searchLeakosint(query)
+        if err == nil {
+            response.LeakosintResults = leakosintResults
+        }
 
     case "phone":
-        leakosintResults, _ := s.searchLeakosint(query)
-        truecallerResults, _ := s.searchTruecaller(query)
+        leakosintResults, err := s.searchLeakosint(query)
+        if err == nil {
+            response.LeakosintResults = leakosintResults
+        }
         
-        response.LeakosintResults.Results = leakosintResults
-        response.TruecallerResults.Results = truecallerResults
+        truecallerResults, err := s.searchTruecaller(query)
+        if err == nil {
+            response.TruecallerResults = truecallerResults
+        }
     }
 
     return response, nil
