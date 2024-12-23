@@ -1,7 +1,11 @@
 // config/config.go
 package config
 
-import "os"
+import (
+	"os"
+	"log"
+	"github.com/joho/godotenv"
+)
 
 type Config struct {
     // Elasticsearch Configuration
