@@ -108,42 +108,40 @@ func (s *SearchService) queryLeakosintAPI(query string) (models.LeakosintRespons
 }
 
 func (s *SearchService) searchLinkedin(query string) ([]models.SearchResult, error) {
-    reqBody := models.LinkedInRequest{
-        Name:    query,
-        Limit:   5,
+    data := map[string]interface{}{
+        "name": query,
+        "company_name": "",
+        "job_title": "",
+        "location": "",
+        "keywords": "",
+        "limit": 15,
     }
 
-    jsonData, err := json.Marshal(reqBody)
-    if err != nil {
-        return nil, fmt.Errorf("error marshaling request: %v", err)
-    }
-
-    req, err := http.NewRequest("POST", s.config.LinkedinURL, bytes.NewBuffer(jsonData))
-    if err != nil {
-        return nil, fmt.Errorf("error creating request: %v", err)
-    }
+    jsonData, _ := json.Marshal(data)
+    req, _ := http.NewRequest("POST", s.config.LinkedinURL, bytes.NewBuffer(jsonData))
 
     req.Header.Set("Content-Type", "application/json")
     req.Header.Set("x-rapidapi-key", s.config.LinkedinAPIKey)
     req.Header.Set("x-rapidapi-host", s.config.LinkedinAPIHost)
 
-    client := &http.Client{Timeout: time.Second * 10}
+    client := &http.Client{}
     resp, err := client.Do(req)
     if err != nil {
-        return nil, fmt.Errorf("error making request: %v", err)
+        return nil, err
     }
     defer resp.Body.Close()
 
-    var profiles []models.LinkedInProfile
-    if err := json.NewDecoder(resp.Body).Decode(&profiles); err != nil {
-        return nil, fmt.Errorf("error decoding response: %v", err)
+    var apiResponse []interface{}
+    if err := json.NewDecoder(resp.Body).Decode(&apiResponse); err != nil {
+        return nil, err
     }
 
     var results []models.SearchResult
-    for _, profile := range profiles {
+    for _, data := range apiResponse {
         results = append(results, models.SearchResult{
+            ID:        fmt.Sprintf("linkedin_%d", time.Now().UnixNano()),
             Source:    "linkedin",
-            Data:     profile,
+            Data:      data,
             Timestamp: time.Now(),
         })
     }
