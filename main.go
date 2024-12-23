@@ -14,14 +14,6 @@ func main() {
 	// Load configuration
 	cfg := config.LoadConfig()
 
-	// Initialize Elasticsearch client
-	es, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{cfg.ElasticsearchURL},
-	})
-	if err != nil {
-		log.Fatalf("Error creating Elasticsearch client: %s", err)
-	}
-
 	// Initialize services
 	searchService := services.NewSearchService(es, cfg)
 
