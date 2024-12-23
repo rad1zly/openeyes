@@ -2,9 +2,9 @@ package main
 
 import (
 	"log"
-	"config/config"
-	"controllers/search_controller"
-	"services/search_service"
+	"openeyes/config"
+	"openeyes/controllers"
+	"openeyes/services"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gin-gonic/gin"
