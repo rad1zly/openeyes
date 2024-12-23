@@ -1,12 +1,9 @@
 package main
 
 import (
-	"log"
 	"openeyes/config"
 	"openeyes/controllers"
 	"openeyes/services"
-
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,7 +12,7 @@ func main() {
 	cfg := config.LoadConfig()
 
 	// Initialize services
-	searchService := services.NewSearchService(es, cfg)
+	searchService := services.NewSearchService(cfg)
 
 	// Initialize controller
 	searchController := controllers.NewSearchController(searchService)
