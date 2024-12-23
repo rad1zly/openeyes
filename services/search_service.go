@@ -69,49 +69,40 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
 }
 
 func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, error) {
-    reqBody := models.LeakosintRequest{
-        Token:   s.config.LeakosintAPIKey,  // dari .env
-        Request: query,                    // dari parameter
-        Limit:   100,
-        Lang:    "en",
+    data := map[string]interface{}{
+        "token":   s.config.LeakosintAPIKey,
+        "request": query,
+        "limit":   100,
+        "lang":    "en",
     }
 
-    jsonData, err := json.Marshal(reqBody)
-    if err != nil {
-        return nil, fmt.Errorf("error marshaling request: %v", err)
-    }
+    jsonData, _ := json.Marshal(data)
+    fmt.Printf("Request: %s\n", string(jsonData))
 
-    req, err := http.NewRequest("POST", s.config.LeakosintURL, bytes.NewBuffer(jsonData))
-    if err != nil {
-        return nil, fmt.Errorf("error creating request: %v", err)
-    }
-
-    // Hanya perlu content-type json
+    req, _ := http.NewRequest("POST", s.config.LeakosintURL, bytes.NewBuffer(jsonData))
     req.Header.Set("Content-Type", "application/json")
 
-    client := &http.Client{Timeout: time.Second * 10}
+    client := &http.Client{}
     resp, err := client.Do(req)
     if err != nil {
-        return nil, fmt.Errorf("error making request: %v", err)
+        fmt.Printf("Error: %v\n", err)
+        return nil, err
     }
     defer resp.Body.Close()
 
-    var leakosintResp models.LeakosintResponse
-    if err := json.NewDecoder(resp.Body).Decode(&leakosintResp); err != nil {
-        return nil, fmt.Errorf("error decoding response: %v", err)
-    }
+    body, _ := ioutil.ReadAll(resp.Body)
+    fmt.Printf("Response: %s\n", string(body))
+
+    var result models.LeakosintResponse
+    json.Unmarshal(body, &result)
 
     var results []models.SearchResult
-    if leakosintResp.List != nil {
-        for source, sourceData := range leakosintResp.List {
-            for _, data := range sourceData.Data {
-                result := models.SearchResult{
-                    Source:    source,
-                    Data:     data,
-                    Timestamp: time.Now(),
-                }
-                results = append(results, result)
-            }
+    for source, sourceData := range result.List {
+        for _, data := range sourceData.Data {
+            results = append(results, models.SearchResult{
+                Source: source,
+                Data:   data,
+            })
         }
     }
 
