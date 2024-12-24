@@ -43,6 +43,9 @@ func LoadConfig() *Config {
 		TruecallerURL: 	   "https://truecaller-data2.p.rapidapi.com/search",
 		TruecallerAPIKey:  os.Getenv("TRUECALLER_API_KEY"),
 		TruecallerAPIHost: "truecaller-data2.p.rapidapi.com",
+        ElasticsearchURL:   "http://localhost:9200",
+        ElasticsearchUser:     "elastic",
+        ElasticsearchPassword: os.Getenv("ELASTICSEARCH_PASSWORD"),
 	}
 }
 

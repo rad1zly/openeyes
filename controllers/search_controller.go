@@ -18,7 +18,7 @@ func NewSearchController(searchService *services.SearchService) *SearchControlle
 }
 
 func (c *SearchController) Search(ctx *gin.Context) {
-	query := ctx.Query("q")
+	query := ctx.Query("")
 	if query == "" {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Query parameter 'q' is required"})
 		return
