@@ -35,6 +35,7 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
     // Cari di ELK dulu
     elkResults, _ := s.searchElk(query, searchType)
     if len(elkResults) > 0 {
+        fmt.Printf("\n🔍 Data ditemukan di ELK\n")
         // Masukkan hasil sesuai sumbernya
         for _, result := range elkResults {
             switch result.Source {
@@ -54,6 +55,7 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
         // Cari di Leakosint
         leakResults, _ := s.searchLeakosint(query)
         if len(leakResults) > 0 {
+            fmt.Printf("✅ Data ditemukan di Leakosint API\n")
             for _, result := range leakResults {
                 // Simpan hasil ke ELK
                 s.saveToElk(result, "name")
@@ -64,6 +66,7 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
         // Cari di LinkedIn
         linkResults, _ := s.searchLinkedin(query)
         if len(linkResults) > 0 {
+            fmt.Printf("✅ Data ditemukan di LinkedIn API\n")
             for _, result := range linkResults {
                 // Simpan hasil ke ELK 
                 s.saveToElk(result, "name")
@@ -76,6 +79,7 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
         // Cari di Leakosint
         leakResults, _ := s.searchLeakosint(query)
         if len(leakResults) > 0 {
+            fmt.Printf("✅ Data ditemukan di Leakosint API\n")
             for _, result := range leakResults {
                 // Simpan hasil ke ELK
                 s.saveToElk(result, "nik")
@@ -88,6 +92,7 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
         // Cari di Leakosint
         leakResults, _ := s.searchLeakosint(query)
         if len(leakResults) > 0 {
+            fmt.Printf("✅ Data ditemukan di leakosint API\n")
             for _, result := range leakResults {
                 // Simpan hasil ke ELK
                 s.saveToElk(result, "phone")
@@ -98,6 +103,7 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
         // Cari di Truecaller
         trueResults, _ := s.searchTruecaller(query)
         if len(trueResults) > 0 {
+            fmt.Printf("✅ Data ditemukan di Truecaller API\n")
             for _, result := range trueResults {
                 // Simpan hasil ke ELK
                 s.saveToElk(result, "phone")
