@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"openeyes/config"
 	"openeyes/controllers"
 	"openeyes/services"
@@ -17,7 +18,7 @@ func main() {
 	// Initialize controller
 	searchController := controllers.NewSearchController(searchService)
 // Test koneksi ke ELK
-    if err := searchService.testElkConnection(); err != nil {
+    if err := services.testElkConnection(); err != nil {
         fmt.Printf("Failed to connect to Elasticsearch: %v\n", err)
         return
     }
