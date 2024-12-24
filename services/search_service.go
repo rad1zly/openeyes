@@ -10,6 +10,8 @@ import (
     "time"
     "openeyes/config"
     "openeyes/models"
+    "context"
+    "github.com/elastic/go-elasticsearch/v8"
 )
 
 type SearchService struct {
