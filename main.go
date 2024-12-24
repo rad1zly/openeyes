@@ -18,7 +18,7 @@ func main() {
 	// Initialize controller
 	searchController := controllers.NewSearchController(searchService)
 // Test koneksi ke ELK
-    if err := services.testElkConnection(); err != nil {
+    if err := searchService.testElkConnection(); err != nil {
         fmt.Printf("Failed to connect to Elasticsearch: %v\n", err)
         return
     }
