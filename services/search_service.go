@@ -24,6 +24,30 @@ func NewSearchService(cfg *config.Config) *SearchService {
 
 func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
     response := &models.SearchResponse{Query: query}
+
+    searchType := "name"
+    if isNIK(query) {
+        searchType = "nik" 
+    } else if isPhone(query) {
+        searchType = "phone"
+    }
+
+    // Cari di ELK dulu
+    elkResults, _ := s.searchElk(query, searchType)
+    if len(elkResults) > 0 {
+        // Masukkan hasil sesuai sumbernya
+        for _, result := range elkResults {
+            switch result.Source {
+            case "leakosint":
+                response.LeakosintResults = append(response.LeakosintResults, result)
+            case "linkedin":
+                response.LinkedinResults = append(response.LinkedinResults, result)  
+            case "truecaller":
+                response.TruecallerResults = append(response.TruecallerResults, result)
+            }
+        }
+        return response, nil
+    }
  
     // Untuk pencarian nama
     if !isNIK(query) && !isPhone(query) {
@@ -302,3 +326,71 @@ func (s *SearchService) TestElkConnection() error {
     fmt.Printf("Connected to Elasticsearch version: %v\n", result["version"].(map[string]interface{})["number"])
     return nil
 }
+
+func (s *SearchService) searchElk(query string, sourceType string) ([]models.SearchResult, error) {
+    searchQuery := map[string]interface{}{
+        "query": map[string]interface{}{
+            "multi_match": map[string]interface{}{
+                "query": query,
+                "fields": getSearchFields(sourceType),
+            },
+        },
+    }
+ 
+    jsonData, err := json.Marshal(searchQuery)
+    if err != nil {
+        return nil, err
+    }
+ 
+    url := fmt.Sprintf("%s/%s_data/_search", s.config.ElasticsearchURL, sourceType)
+    req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+    if err != nil {
+        return nil, err
+    }
+ 
+    req.Header.Set("Content-Type", "application/json")
+    req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
+ 
+    client := &http.Client{} 
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, err
+    }
+    defer resp.Body.Close()
+ 
+    var result map[string]interface{}
+    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+        return nil, err
+    }
+ 
+    var searchResults []models.SearchResult
+    if hits, ok := result["hits"].(map[string]interface{}); ok {
+        if hitsList, ok := hits["hits"].([]interface{}); ok {
+            for _, hit := range hitsList {
+                if hitMap, ok := hit.(map[string]interface{}); ok {
+                    if source, ok := hitMap["_source"].(map[string]interface{}); ok {
+                        searchResults = append(searchResults, models.SearchResult{
+                            Source: source["Source"].(string),
+                            Data:   source["Data"],
+                        })
+                    }
+                }
+            }
+        }
+    }
+ 
+    return searchResults, nil
+ }
+ 
+ func getSearchFields(sourceType string) []string {
+    switch sourceType {
+    case "name":
+        return []string{"Data.FullName", "Data.Email", "Data.Name.FullName"} 
+    case "phone":
+        return []string{"Data.Phone", "Data.phoneInfo.e164Format"}
+    case "nik":
+        return []string{"Data.NIK", "Data.Passport"}
+    default:
+        return []string{"Data.*"}
+    }
+ }
