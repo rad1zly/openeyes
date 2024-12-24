@@ -334,41 +334,44 @@ func (s *SearchService) TestElkConnection() error {
 }
 
 func (s *SearchService) searchElk(query string, sourceType string) ([]models.SearchResult, error) {
+    // Print untuk debug
+    fmt.Printf("\nSearching in ELK - Type: %s, Query: %s\n", sourceType, query)
+
     searchQuery := map[string]interface{}{
         "query": map[string]interface{}{
-            "multi_match": map[string]interface{}{
-                "query": query,
-                "fields": getSearchFields(sourceType),
-            },
-        },
+            "query_string": map[string]interface{}{
+                "query": fmt.Sprintf("*%s*", query),
+                "fields": []string{"Data.FullName", "Data.Email", "Data.Phone", "Data.NIK", "Data.Passport"}
+            }
+        }
     }
- 
-    jsonData, err := json.Marshal(searchQuery)
-    if err != nil {
-        return nil, err
-    }
- 
+
+    jsonData, _ := json.Marshal(searchQuery)
+    fmt.Printf("ELK Query: %s\n", string(jsonData))
+
     url := fmt.Sprintf("%s/%s_data/_search", s.config.ElasticsearchURL, sourceType)
     req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
     if err != nil {
         return nil, err
     }
- 
+
     req.Header.Set("Content-Type", "application/json")
     req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
- 
-    client := &http.Client{} 
+
+    client := &http.Client{}
     resp, err := client.Do(req)
     if err != nil {
         return nil, err
     }
     defer resp.Body.Close()
- 
+
+    // Print response untuk debug
+    body, _ := ioutil.ReadAll(resp.Body)
+    fmt.Printf("ELK Response: %s\n", string(body))
+
     var result map[string]interface{}
-    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-        return nil, err
-    }
- 
+    json.Unmarshal(body, &result)
+
     var searchResults []models.SearchResult
     if hits, ok := result["hits"].(map[string]interface{}); ok {
         if hitsList, ok := hits["hits"].([]interface{}); ok {
@@ -384,19 +387,19 @@ func (s *SearchService) searchElk(query string, sourceType string) ([]models.Sea
             }
         }
     }
- 
+
     return searchResults, nil
- }
+}
  
- func getSearchFields(sourceType string) []string {
-    switch sourceType {
-    case "name":
-        return []string{"Data.FullName", "Data.Email", "Data.Name.FullName"} 
-    case "phone":
-        return []string{"Data.Phone", "Data.phoneInfo.e164Format"}
-    case "nik":
-        return []string{"Data.NIK", "Data.Passport"}
-    default:
-        return []string{"Data.*"}
-    }
- }
+//  func getSearchFields(sourceType string) []string {
+//     switch sourceType {
+//     case "name":
+//         return []string{"Data.FullName", "Data.Email", "Data.Name.FullName"} 
+//     case "phone":
+//         return []string{"Data.Phone", "Data.phoneInfo.e164Format"}
+//     case "nik":
+//         return []string{"Data.NIK", "Data.Passport"}
+//     default:
+//         return []string{"Data.*"}
+//     }
+//  }
