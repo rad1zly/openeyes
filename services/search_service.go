@@ -274,7 +274,8 @@ func (s *SearchService) saveToElk(result models.SearchResult, sourceType string)
     return nil
 }
 
-func (s *SearchService) testElkConnection() error {
+// Export fungsi dengan huruf kapital di awal
+func (s *SearchService) TestElkConnection() error {
     req, err := http.NewRequest("GET", s.config.ElasticsearchURL, nil)
     if err != nil {
         return fmt.Errorf("error creating request: %v", err)
