@@ -333,7 +333,7 @@ func (s *SearchService) TestElkConnection() error {
     return nil
 }
 
-unc (s *SearchService) searchElk(query string, sourceType string) ([]models.SearchResult, error) {
+func (s *SearchService) searchElk(query string, sourceType string) ([]models.SearchResult, error) {
     searchQuery := map[string]interface{}{
         "query": map[string]interface{}{
             "match_all": map[string]interface{}{},
