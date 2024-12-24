@@ -334,56 +334,40 @@ func (s *SearchService) TestElkConnection() error {
 }
 
 func (s *SearchService) searchElk(query string, sourceType string) ([]models.SearchResult, error) {
-    // Print untuk debug
-    fmt.Printf("\nSearching in ELK - Type: %s, Query: %s\n", sourceType, query)
-
-    searchQuery := map[string]interface{}{
-        "query": map[string]interface{}{
-            "query_string": map[string]interface{}{
-                "query": fmt.Sprintf("*%s*", query),
-                "fields": []string{"Data.FullName", "Data.Email", "Data.Phone", "Data.NIK", "Data.Passport"},
-            },
-        },
-    }
-
-    jsonData, _ := json.Marshal(searchQuery)
-    fmt.Printf("ELK Query: %s\n", string(jsonData))
-
-    url := fmt.Sprintf("%s/%s_data/_search", s.config.ElasticsearchURL, sourceType)
-    req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+    es, err := elasticsearch.NewClient(elasticsearch.Config{
+        Addresses: []string{s.config.ElasticsearchURL},
+        Username:  s.config.ElasticsearchUser,
+        Password:  s.config.ElasticsearchPassword,
+    })
     if err != nil {
         return nil, err
     }
 
-    req.Header.Set("Content-Type", "application/json")
-    req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
-
-    client := &http.Client{}
-    resp, err := client.Do(req)
+    res, err := es.Search(
+        es.Search.WithContext(context.Background()),
+        es.Search.WithIndex(fmt.Sprintf("%s_data", sourceType)),
+        es.Search.WithQuery(query),
+        es.Search.WithTrackTotalHits(true),
+        es.Search.WithPretty(),
+    )
     if err != nil {
         return nil, err
     }
-    defer resp.Body.Close()
-
-    // Print response untuk debug
-    body, _ := ioutil.ReadAll(resp.Body)
-    fmt.Printf("ELK Response: %s\n", string(body))
+    defer res.Body.Close()
 
     var result map[string]interface{}
-    json.Unmarshal(body, &result)
+    if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+        return nil, err
+    }
 
     var searchResults []models.SearchResult
-    if hits, ok := result["hits"].(map[string]interface{}); ok {
-        if hitsList, ok := hits["hits"].([]interface{}); ok {
-            for _, hit := range hitsList {
-                if hitMap, ok := hit.(map[string]interface{}); ok {
-                    if source, ok := hitMap["_source"].(map[string]interface{}); ok {
-                        searchResults = append(searchResults, models.SearchResult{
-                            Source: source["Source"].(string),
-                            Data:   source["Data"],
-                        })
-                    }
-                }
+    if hits, ok := result["hits"].(map[string]interface{})["hits"].([]interface{}); ok {
+        for _, hit := range hits {
+            if source, ok := hit.(map[string]interface{})["_source"].(map[string]interface{}); ok {
+                searchResults = append(searchResults, models.SearchResult{
+                    Source: source["Source"].(string),
+                    Data:   source["Data"],
+                })
             }
         }
     }
