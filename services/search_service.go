@@ -24,31 +24,66 @@ func NewSearchService(cfg *config.Config) *SearchService {
 
 func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
     response := &models.SearchResponse{Query: query}
-
+ 
     // Untuk pencarian nama
     if !isNIK(query) && !isPhone(query) {
+        // Cari di Leakosint
         leakResults, _ := s.searchLeakosint(query)
-        response.LeakosintResults = leakResults
-        
+        if len(leakResults) > 0 {
+            for _, result := range leakResults {
+                // Simpan hasil ke ELK
+                s.saveToElk(result, "name")
+            }
+            response.LeakosintResults = leakResults
+        }
+ 
+        // Cari di LinkedIn
         linkResults, _ := s.searchLinkedin(query)
-        if linkResults != nil && len(linkResults) > 0 {
+        if len(linkResults) > 0 {
+            for _, result := range linkResults {
+                // Simpan hasil ke ELK 
+                s.saveToElk(result, "name")
+            }
             response.LinkedinResults = linkResults
         }
+ 
+    // Untuk pencarian NIK
     } else if isNIK(query) {
+        // Cari di Leakosint
         leakResults, _ := s.searchLeakosint(query)
-        response.LeakosintResults = leakResults
+        if len(leakResults) > 0 {
+            for _, result := range leakResults {
+                // Simpan hasil ke ELK
+                s.saveToElk(result, "nik")
+            }
+            response.LeakosintResults = leakResults
+        }
+ 
+    // Untuk pencarian nomor telepon
     } else if isPhone(query) {
+        // Cari di Leakosint
         leakResults, _ := s.searchLeakosint(query)
-        response.LeakosintResults = leakResults
-        
+        if len(leakResults) > 0 {
+            for _, result := range leakResults {
+                // Simpan hasil ke ELK
+                s.saveToElk(result, "phone")
+            }
+            response.LeakosintResults = leakResults
+        }
+ 
+        // Cari di Truecaller
         trueResults, _ := s.searchTruecaller(query)
-        if trueResults != nil && len(trueResults) > 0 {
+        if len(trueResults) > 0 {
+            for _, result := range trueResults {
+                // Simpan hasil ke ELK
+                s.saveToElk(result, "phone")
+            }
             response.TruecallerResults = trueResults
         }
     }
-
+ 
     return response, nil
-}
+ }
 
 func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, error) {
     apiResponse, err := s.queryLeakosintAPI(query)
@@ -203,4 +238,66 @@ func isNIK(query string) bool {
 
 func isPhone(query string) bool {
     return len(query) >= 10 && query[0] == '6'
+}
+
+func (s *SearchService) saveToElk(result models.SearchResult, sourceType string) error {
+    // Siapkan data yang akan disimpan
+    jsonData, err := json.Marshal(result)
+    if err != nil {
+        return fmt.Errorf("error marshaling data: %v", err)
+    }
+
+    // Buat request ke Elasticsearch
+    url := fmt.Sprintf("%s/%s_data/_doc", s.config.ElasticsearchURL, sourceType)
+    req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+    if err != nil {
+        return fmt.Errorf("error creating request: %v", err)
+    }
+
+    // Set header dan auth
+    req.Header.Set("Content-Type", "application/json")
+    req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
+
+    // Kirim request
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return fmt.Errorf("error saving to elasticsearch: %v", err)
+    }
+    defer resp.Body.Close()
+
+    // Cek response
+    if resp.StatusCode >= 400 {
+        return fmt.Errorf("elasticsearch error: status code %d", resp.StatusCode)
+    }
+
+    return nil
+}
+
+func (s *SearchService) testElkConnection() error {
+    req, err := http.NewRequest("GET", s.config.ElasticsearchURL, nil)
+    if err != nil {
+        return fmt.Errorf("error creating request: %v", err)
+    }
+
+    req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return fmt.Errorf("error connecting to elasticsearch: %v", err)
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK {
+        return fmt.Errorf("elasticsearch returned status: %d", resp.StatusCode)
+    }
+
+    var result map[string]interface{}
+    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+        return fmt.Errorf("error decoding response: %v", err)
+    }
+
+    fmt.Printf("Connected to Elasticsearch version: %v\n", result["version"].(map[string]interface{})["number"])
+    return nil
 }
