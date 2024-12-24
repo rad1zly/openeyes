@@ -333,20 +333,19 @@ func (s *SearchService) TestElkConnection() error {
     return nil
 }
 
-func (s *SearchService) searchElk(query string, sourceType string) ([]models.SearchResult, error) {
+unc (s *SearchService) searchElk(query string, sourceType string) ([]models.SearchResult, error) {
     searchQuery := map[string]interface{}{
         "query": map[string]interface{}{
-            "match": map[string]interface{}{
-                "_source.Data": query,
-            },
+            "match_all": map[string]interface{}{},
         },
+        "size": 100,
     }
 
-    jsonData, _ := json.Marshal(searchQuery)
+    // Set URL dan lakukan request ke ELK
     url := fmt.Sprintf("%s/%s_data/_search", s.config.ElasticsearchURL, sourceType)
-    
-    fmt.Printf("Checking index: %s\n", url)
+    fmt.Printf("Mencari di index: %s\n", url)
 
+    jsonData, _ := json.Marshal(searchQuery)
     req, _ := http.NewRequest("GET", url, bytes.NewBuffer(jsonData))
     req.Header.Set("Content-Type", "application/json")
     req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
@@ -358,10 +357,10 @@ func (s *SearchService) searchElk(query string, sourceType string) ([]models.Sea
     }
     defer resp.Body.Close()
 
-    // Print raw response untuk debug
     body, _ := ioutil.ReadAll(resp.Body)
-    fmt.Printf("Response: %s\n", string(body))
+    fmt.Printf("Data di ELK: %s\n", string(body))
 
+    // Proses response
     var result map[string]interface{}
     json.Unmarshal(body, &result)
 
