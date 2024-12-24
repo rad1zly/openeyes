@@ -341,7 +341,7 @@ func (s *SearchService) searchElk(query string, sourceType string) ([]models.Sea
         "query": map[string]interface{}{
             "query_string": map[string]interface{}{
                 "query": fmt.Sprintf("*%s*", query),
-                "fields": []string{"Data.FullName", "Data.Email", "Data.Phone", "Data.NIK", "Data.Passport"}
+                "fields": []string{"Data.FullName", "Data.Email", "Data.Phone", "Data.NIK", "Data.Passport"},
             }
         }
     }
