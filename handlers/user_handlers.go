@@ -1,11 +1,15 @@
 package handlers
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
-	"openeyes/database"
-	"openeyes/models"
+	"user-management/database"
+	"user-management/models"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
@@ -26,7 +30,8 @@ func LoginHandler(c *gin.Context) {
 
 	db := database.GetDB()
 	var user models.User
-	if err := db.Where("username = ?", loginData.Username).First(&user).Error; err != nil {
+	err := db.QueryRow("SELECT id, username, password, role FROM users WHERE username = ?", loginData.Username).Scan(&user.ID, &user.Username, &user.Password, &user.Role)
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
@@ -67,7 +72,8 @@ func CreateUserHandler(c *gin.Context) {
 	newUser.Role = "user"
 
 	db := database.GetDB()
-	if err := db.Create(&newUser).Error; err != nil {
+	_, err = db.Exec("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", newUser.Username, newUser.Password, newUser.Role)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return
 	}
@@ -99,7 +105,8 @@ func ResetPasswordHandler(c *gin.Context) {
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(tempPassword), bcrypt.DefaultCost)
 
 	db := database.GetDB()
-	if err := db.Model(&models.User{}).Where("username = ?", resetData.Username).Update("password", string(hashedPassword)).Error; err != nil {
+	_, err = db.Exec("UPDATE users SET password = ? WHERE username = ?", string(hashedPassword), resetData.Username)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset password"})
 		return
 	}
@@ -124,19 +131,21 @@ func ChangePasswordHandler(c *gin.Context) {
 	}
 
 	db := database.GetDB()
-	var currentUser models.User
-	if err := db.First(&currentUser, user.ID).Error; err != nil {
+	var currentPassword string
+	err = db.QueryRow("SELECT password FROM users WHERE id = ?", user.ID).Scan(&currentPassword)
+	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(currentUser.Password), []byte(passwordData.OldPassword)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(currentPassword), []byte(passwordData.OldPassword)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid old password"})
 		return
 	}
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(passwordData.NewPassword), bcrypt.DefaultCost)
-	if err := db.Model(&currentUser).Update("password", string(hashedPassword)).Error; err != nil {
+	_, err = db.Exec("UPDATE users SET password = ? WHERE id = ?", string(hashedPassword), user.ID)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to change password"})
 		return
 	}
@@ -165,7 +174,8 @@ func DeleteUserHandler(c *gin.Context) {
 	}
 
 	db := database.GetDB()
-	if err := db.Where("username = ?", deleteData.Username).Delete(&models.User{}).Error; err != nil {
+	_, err = db.Exec("DELETE FROM users WHERE username = ?", deleteData.Username)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
 		return
 	}
@@ -176,7 +186,7 @@ func DeleteUserHandler(c *gin.Context) {
 func authenticate(c *gin.Context) (models.User, error) {
 	tokenString := c.GetHeader("Authorization")
 	if tokenString == "" {
-		return models.User{}, jwt.ErrNoTokenInRequest
+		return models.User{}, fmt.Errorf("No token provided")
 	}
 
 	tokenString = strings.Replace(tokenString, "Bearer ", "", 1)
@@ -185,10 +195,11 @@ func authenticate(c *gin.Context) (models.User, error) {
 		return models.User{}, err
 	}
 
-	userID := claims.(jwt.MapClaims)["id"].(float64)
+	userID := uint(claims.(jwt.MapClaims)["id"].(float64))
 	var user models.User
 	db := database.GetDB()
-	if err := db.First(&user, uint(userID)).Error; err != nil {
+	err = db.QueryRow("SELECT id, username, role FROM users WHERE id = ?", userID).Scan(&user.ID, &user.Username, &user.Role)
+	if err != nil {
 		return models.User{}, err
 	}
 
