@@ -2,15 +2,24 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"openeyes/config"
 	"openeyes/controllers"
 	"openeyes/services"
 	"github.com/gin-gonic/gin"
+	"openeyes/database"
+    "openeyes/handlers"
 )
 
 func main() {
 	// Load configuration
 	cfg := config.LoadConfig()
+
+	db, err := database.InitDB()
+    if err != nil {
+        fmt.Printf("Failed to initialize database:", err)
+    }
+    defer db.Close()
 
 	// Initialize services
 	searchService := services.NewSearchService(cfg)
@@ -24,7 +33,7 @@ func main() {
         return
     }
     fmt.Println("Successfully connected to Elasticsearch")
-	
+
 	// Setup Gin router
 	r := gin.Default()
 
@@ -43,6 +52,11 @@ func main() {
 	// Routes
 	api := r.Group("/api")
 	{
+		api.GET("/login", handlers.LoginHandler)
+    	api.GET("/logout", handlers.LogoutHandler)
+    	api.GET("/create-user", handlers.CreateUserHandler)
+        api.GET("/reset-password", handlers.ResetPasswordHandler)
+    	api.GET("/change-password", handlers.ChangePasswordHandler)
 		api.GET("/search", searchController.Search)
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(200, gin.H{"status": "ok"})
