@@ -40,7 +40,7 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
         fmt.Printf("ELK Results: %+v\n", elkResults)
 
         // Response langsung dari data ELK
-        response.LeakosintResults = elkResults
+        response.ElkSearchResults = elkResults
         return response, nil
     }
 

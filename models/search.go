@@ -11,9 +11,10 @@ type SearchResult struct {
 
 type SearchResponse struct {
     Query             string         `json:"query"`
-    LeakosintResults  []SearchResult `json:"leakosint_results"`
+    ElkSearchResults  []SearchResult `json:"search_results"`
+    LeakosintResults  []SearchResult `json:"search_results"`
     LinkedinResults   []SearchResult `json:"linkedin_results,omitempty"`
-    TruecallerResults []SearchResult `json:"truecaller_results,omitempty"`
+    TruecallerResults []SearchResult `json:"phone_results,omitempty"`
 }
 
 type QueryType string
