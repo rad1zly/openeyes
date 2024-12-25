@@ -36,11 +36,18 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
     elkResults, _ := s.searchElk(query, searchType)
     if len(elkResults) > 0 {
         fmt.Printf("\n🔍 Data ditemukan di ELK\n")
-        // Print untuk debug
-        fmt.Printf("ELK Results: %+v\n", elkResults)
-
-        // Response langsung dari data ELK
-        response.LeakosintResults = elkResults
+        
+        // Pisahkan hasil sesuai sumber
+        for _, result := range elkResults {
+            switch result.Source {
+            case "leakosint":
+                response.LeakosintResults = append(response.LeakosintResults, result)
+            case "linkedin":
+                response.LinkedinResults = append(response.LinkedinResults, result)
+            case "truecaller":
+                response.TruecallerResults = append(response.TruecallerResults, result)
+            }
+        }
         return response, nil
     }
 
@@ -256,6 +263,17 @@ func isPhone(query string) bool {
 }
 
 func (s *SearchService) saveToElk(result models.SearchResult, sourceType string) error {
+    // Index sesuai sumbernya
+    var indexName string
+    switch result.Source {
+    case "leakosint":
+        indexName = "leakosint_data"
+    case "linkedin":
+        indexName = "linkedin_data"
+    case "truecaller":
+        indexName = "truecaller_data"
+    }
+    
     // Siapkan data yang akan disimpan
     jsonData, err := json.Marshal(result)
     if err != nil {
@@ -318,94 +336,96 @@ func (s *SearchService) TestElkConnection() error {
     return nil
 }
 
-func (s *SearchService) searchElk(query string, sourceType string) ([]models.SearchResult, error) {
-    indexName := fmt.Sprintf("%s_data", sourceType)
+func (s *SearchService) searchElk(query string, searchType string) ([]models.SearchResult, error) {
+    var results []models.SearchResult
     
-    // Check index exists
-    reqCheck, _ := http.NewRequest("HEAD", fmt.Sprintf("%s/%s", s.config.ElasticsearchURL, indexName), nil)
-    reqCheck.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
-    
-    clientCheck := &http.Client{}
-    respCheck, err := clientCheck.Do(reqCheck)
-    if err != nil || respCheck.StatusCode == 404 {
-        fmt.Printf("Index %s tidak ditemukan, lanjut ke API\n", indexName)
-        return nil, nil
+    // Tentukan index mana yang perlu dicari berdasarkan tipe pencarian
+    var indexes []string
+    if searchType == "name" {
+        indexes = []string{"leakosint_data", "linkedin_data"}
+    } else if searchType == "phone" {
+        indexes = []string{"leakosint_data", "truecaller_data"}
+    } else if searchType == "nik" {
+        indexes = []string{"leakosint_data"}
     }
 
-    searchQuery := map[string]interface{}{
-        "query": map[string]interface{}{
-            "bool": map[string]interface{}{
-                "should": []map[string]interface{}{
-                    {
-                        "match": map[string]interface{}{
-                            "data.Data.FullName": query,
+    // Cari di setiap index yang sesuai
+    for _, indexName := range indexes {
+        // Check if index exists
+        reqCheck, _ := http.NewRequest("HEAD", fmt.Sprintf("%s/%s", s.config.ElasticsearchURL, indexName), nil)
+        reqCheck.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
+        
+        clientCheck := &http.Client{}
+        respCheck, err := clientCheck.Do(reqCheck)
+        if err != nil || respCheck.StatusCode == 404 {
+            fmt.Printf("Index %s tidak ditemukan\n", indexName)
+            continue
+        }
+
+        searchQuery := map[string]interface{}{
+            "query": map[string]interface{}{
+                "bool": map[string]interface{}{
+                    "should": []map[string]interface{}{
+                        {
+                            "match": map[string]interface{}{
+                                "data.Data.FullName": query,
+                            },
                         },
-                    },
-                    {
-                        "match": map[string]interface{}{
-                            "data.full_name": query,
+                        {
+                            "match": map[string]interface{}{
+                                "data.Data.Phone": query,
+                            },
                         },
-                    },
-                    {
-                        "match": map[string]interface{}{
-                            "data.phoneInfo.e164Format": query,
-                        },
-                    },
-                    {
-                        "match": map[string]interface{}{
-                            "data.Data.Phone": query,
-                        },
-                    },
-                    {
-                        "match": map[string]interface{}{
-                            "data.Data.Passport": query,
+                        {
+                            "match": map[string]interface{}{
+                                "data.Data.Passport": query,
+                            },
                         },
                     },
                 },
             },
-        },
-    }
+        }
 
-    url := fmt.Sprintf("%s/%s/_search", s.config.ElasticsearchURL, indexName)
-    fmt.Printf("Mencari di index: %s\n", url)
+        // Search di index ini
+        url := fmt.Sprintf("%s/%s/_search", s.config.ElasticsearchURL, indexName)
+        fmt.Printf("Mencari di index: %s\n", url)
 
-    jsonData, _ := json.Marshal(searchQuery)
-    req, _ := http.NewRequest("GET", url, bytes.NewBuffer(jsonData))
-    req.Header.Set("Content-Type", "application/json")
-    req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
+        jsonData, _ := json.Marshal(searchQuery)
+        req, _ := http.NewRequest("GET", url, bytes.NewBuffer(jsonData))
+        req.Header.Set("Content-Type", "application/json")
+        req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
 
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        return nil, err
-    }
-    defer resp.Body.Close()
+        client := &http.Client{}
+        resp, err := client.Do(req)
+        if err != nil {
+            continue
+        }
+        defer resp.Body.Close()
 
-    body, _ := ioutil.ReadAll(resp.Body)
-    //fmt.Printf("Data di ELK: %s\n", string(body))
+        var result map[string]interface{}
+        json.NewDecoder(resp.Body).Decode(&result)
 
-    var result map[string]interface{}
-    json.Unmarshal(body, &result)
-
-    var searchResults []models.SearchResult
-    if hits, ok := result["hits"].(map[string]interface{}); ok {
-        if hitsList, ok := hits["hits"].([]interface{}); ok {
-            for _, hit := range hitsList {
-                if hitMap, ok := hit.(map[string]interface{}); ok {
-                    if source, ok := hitMap["_source"].(map[string]interface{}); ok {
-                        searchResults = append(searchResults, models.SearchResult{
-                            ID:        source["id"].(string),
-                            Source:    source["source"].(string),
-                            Data:      source["data"],
-                            Timestamp: time.Now(),
-                        })
+        if hits, ok := result["hits"].(map[string]interface{}); ok {
+            if hitsList, ok := hits["hits"].([]interface{}); ok {
+                for _, hit := range hitsList {
+                    if hitMap, ok := hit.(map[string]interface{}); ok {
+                        if source, ok := hitMap["_source"].(map[string]interface{}); ok {
+                            // Append ke results sesuai source nya
+                            searchResult := models.SearchResult{
+                                ID:        source["id"].(string),
+                                Source:    source["source"].(string),
+                                Data:      source["data"],
+                                Timestamp: time.Now(),
+                            }
+                            results = append(results, searchResult)
+                        }
                     }
                 }
             }
         }
     }
 
-    return searchResults, nil
+    return results, nil
 }
 
 //  func getSearchFields(sourceType string) []string {
