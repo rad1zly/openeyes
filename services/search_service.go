@@ -263,7 +263,10 @@ func isPhone(query string) bool {
 }
 
 func (s *SearchService) saveToElk(result models.SearchResult, sourceType string) error {
+    // Data akan disimpan sesuai source asli dari API
     var indexName string
+    
+    // Source sudah dari API (leakosint, linkedin, truecaller)
     switch result.Source {
     case "leakosint":
         indexName = "leakosint_data"
@@ -271,60 +274,32 @@ func (s *SearchService) saveToElk(result models.SearchResult, sourceType string)
         indexName = "linkedin_data"
     case "truecaller":
         indexName = "truecaller_data"
+    default:
+        return fmt.Errorf("unknown source: %s", result.Source)
     }
 
-    fmt.Printf("\n💾 Menyimpan ke index: %s\n", indexName)
-
-    // Generate ID jika kosong
-    if result.ID == "" {
-        result.ID = fmt.Sprintf("%s_%d", time.Now().UnixNano())
-    }
-
-    // Pastikan semua field terisi
     documentData := map[string]interface{}{
-        "id":        result.ID,
-        "source":    result.Source,
+        "id":        fmt.Sprintf("%s_%d", result.Source, time.Now().UnixNano()),
+        "source":    result.Source, // Source asli dari API
         "data":      result.Data,
-       // "timestamp": time.Now(),
+        "timestamp": time.Now(),
     }
 
-    // Debug print
-    jsonDataBytes, _ := json.MarshalIndent(documentData, "", "  ")
-    fmt.Printf("Data yang akan disimpan:\n%s\n", string(jsonDataBytes))
-
-    jsonData, err := json.Marshal(documentData)
-    if err != nil {
-        fmt.Printf("❌ Error saat marshal data: %v\n", err)
-        return fmt.Errorf("error marshaling data: %v", err)
-    }
+    jsonData, _ := json.Marshal(documentData)
+    fmt.Printf("Saving data: %s\n", string(jsonData))
 
     url := fmt.Sprintf("%s/%s/_doc", s.config.ElasticsearchURL, indexName)
-    req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-    if err != nil {
-        fmt.Printf("❌ Error saat membuat request: %v\n", err)
-        return err
-    }
-
+    req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
     req.Header.Set("Content-Type", "application/json")
     req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
 
     client := &http.Client{}
     resp, err := client.Do(req)
     if err != nil {
-        fmt.Printf("❌ Error saat mengirim request: %v\n", err)
         return err
     }
     defer resp.Body.Close()
 
-    body, _ := ioutil.ReadAll(resp.Body)
-    fmt.Printf("Response dari ELK: %s\n", string(body))
-
-    if resp.StatusCode >= 400 {
-        fmt.Printf("❌ Error status code: %d\n", resp.StatusCode)
-        return fmt.Errorf("error saving to elk: status code %d", resp.StatusCode)
-    }
-
-    fmt.Printf("✅ Berhasil disimpan ke ELK - Index: %s\n", indexName)
     return nil
 }
 
