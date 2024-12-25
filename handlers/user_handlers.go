@@ -15,21 +15,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var jwtSecret = GenerateSecretKey()
-
-func GenerateSecretKey() (string, error) {
-	// Generate random 32 byte key
-	key := make([]byte, 32)
-	_, err := rand.Read(key)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate random key: %v", err)
-	}
-	
-	// Convert to base64 string untuk memudahkan penyimpanan
-	secretKey := base64.StdEncoding.EncodeToString(key)
-	
-	return secretKey, nil
- }
+var jwtSecret = []byte("89302666a7b09cd4426b5997a9d6c6cd11e052084886db20ea6acd5ee55fbe57")
 
 func LoginHandler(c *gin.Context) {
 	var loginData struct {
