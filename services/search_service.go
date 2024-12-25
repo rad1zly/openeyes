@@ -355,8 +355,8 @@ func (s *SearchService) searchElk(query string, sourceType string) ([]models.Sea
                 "_source.Data": query,
             },
         },
-        "size": 10,
-        "from": 0
+        "size": 100,
+        "from": 0,
     }
 
     url := fmt.Sprintf("%s/%s_data/_search", s.config.ElasticsearchURL, sourceType)
