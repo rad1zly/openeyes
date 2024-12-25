@@ -36,16 +36,11 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
     elkResults, _ := s.searchElk(query, searchType)
     if len(elkResults) > 0 {
         fmt.Printf("\n🔍 Data ditemukan di ELK\n")
-        for _, result := range elkResults {
-            switch result.Source {
-            case "leakosint":
-                response.LeakosintResults = append(response.LeakosintResults, result)
-            case "linkedin":
-                response.LinkedinResults = append(response.LinkedinResults, result)
-            case "truecaller":
-                response.TruecallerResults = append(response.TruecallerResults, result)
-            }
-        }
+        // Print untuk debug
+        fmt.Printf("ELK Results: %+v\n", elkResults)
+
+        // Response langsung dari data ELK
+        response.LeakosintResults = elkResults
         return response, nil
     }
 
