@@ -15,11 +15,13 @@ func main() {
 	// Load configuration
 	cfg := config.LoadConfig()
 
-	db, err := database.InitDB()
+	db, err := database.initDB()
     if err != nil {
         fmt.Printf("Failed to initialize database:", err)
     }
     defer db.Close()
+	fmt.Println("Successfully connected to sql")
+
 
 	// Initialize services
 	searchService := services.NewSearchService(cfg)
