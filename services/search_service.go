@@ -263,18 +263,25 @@ func isPhone(query string) bool {
 }
 
 func (s *SearchService) saveToElk(result models.SearchResult, sourceType string) error {
-    // Data akan disimpan sesuai source asli dari API
+    fmt.Printf("\nSaving to ELK - Original Source: %s\n", result.Source)
+
+    // Periksa data sebelum disimpan
+    jsonDataDebug, _ := json.MarshalIndent(result, "", "  ")
+    fmt.Printf("Data to save: %s\n", string(jsonDataDebug))
+
     var indexName string
-    
-    // Source sudah dari API (leakosint, linkedin, truecaller)
     switch result.Source {
     case "leakosint":
         indexName = "leakosint_data"
+        fmt.Printf("Using leakosint index\n")
     case "linkedin":
         indexName = "linkedin_data"
+        fmt.Printf("Using linkedin index\n")
     case "truecaller":
         indexName = "truecaller_data"
+        fmt.Printf("Using truecaller index\n")
     default:
+        fmt.Printf("Unknown source: %s\n", result.Source)
         return fmt.Errorf("unknown source: %s", result.Source)
     }
 
@@ -380,7 +387,7 @@ func (s *SearchService) searchElk(query string, searchType string) ([]models.Sea
                         },
                         {
                             "match": map[string]interface{}{
-                                "data.Data.phoneInfo.e164Format": query,
+                                "data.phoneInfo.e164Format": query,
                             },
                         },
                         {
