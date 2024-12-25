@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"openeyes/database"
     "openeyes/handlers"
+	"openeyes/middleware"
 )
 
 func main() {
@@ -52,6 +53,7 @@ func main() {
 
 	// Routes
 	api := r.Group("/api")
+	api.Use(middleware.AuthMiddleware())
 	{
 		api.GET("/search", searchController.Search)
 		api.POST("/login", handlers.LoginHandler)

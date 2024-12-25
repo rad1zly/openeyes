@@ -18,9 +18,15 @@ func NewSearchController(searchService *services.SearchService) *SearchControlle
 }
 
 func (c *SearchController) Search(ctx *gin.Context) {
+	userID, exists := c.Get("userID")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+        return
+    }
+	
 	query := ctx.Query("")
 	if query == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Query parameter 'q' is required"})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Query parameter is required"})
 		return
 	}
 

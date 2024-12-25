@@ -1,7 +1,8 @@
 package handlers
 
 import (
-//	"crypto/rand"
+    "crypto/rand"
+	"math/big"
 //	"encoding/base64"
 //	"encoding/json"
 	"fmt"
@@ -231,7 +232,14 @@ func verifyToken(tokenString string) (jwt.Claims, error) {
 }
 
 func generateRandomPassword() string {
-	// Implement random password generation logic here
-	// For simplicity, we'll just return a hardcoded password for now
-	return "tempPassword123"
+    length := 12
+    chars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}|;:,.<>?"
+    password := make([]byte, length)
+
+    for i := 0; i < length; i++ {
+        charIndex, _ := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+        password[i] = chars[charIndex.Int64()]
+    }
+
+    return string(password)
 }
