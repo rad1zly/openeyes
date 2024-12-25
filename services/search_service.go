@@ -338,24 +338,27 @@ func (s *SearchService) searchElk(query string, sourceType string) ([]models.Sea
     indexName := fmt.Sprintf("%s_data", sourceType)
     
     // Check if index exists
-    req, _ := http.NewRequest("HEAD", fmt.Sprintf("%s/%s", s.config.ElasticsearchURL, indexName), nil)
-    req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
+    reqCheck, _ := http.NewRequest("HEAD", fmt.Sprintf("%s/%s", s.config.ElasticsearchURL, indexName), nil)
+    reqCheck.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
     
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil || resp.StatusCode == 404 {
+    clientCheck := &http.Client{}
+    respCheck, err := clientCheck.Do(reqCheck)
+    if err != nil || respCheck.StatusCode == 404 {
         fmt.Printf("Index %s tidak ditemukan, lanjut ke API\n", indexName)
-        return nil, nil // Return nil agar lanjut ke API search
+        return nil, nil
     }
 
+    // Lanjut dengan pencarian jika index ada
     searchQuery := map[string]interface{}{
         "query": map[string]interface{}{
-            "match_all": map[string]interface{}{},
+            "match": map[string]interface{}{
+                "_source.Data": query,
+            },
         },
-        "size": 100,
+        "size": 10,
+        "from": 0
     }
 
-    // Set URL dan lakukan request ke ELK
     url := fmt.Sprintf("%s/%s_data/_search", s.config.ElasticsearchURL, sourceType)
     fmt.Printf("Mencari di index: %s\n", url)
 
