@@ -44,6 +44,12 @@ func InitDB() (*sql.DB, error) {
 }
 
 func GetDB() *sql.DB {
-    once.Do(InitDB)
+    once.Do(func() {
+        var err error
+        db, err = InitDB()
+        if err != nil {
+            log.Fatal("Failed to initialize database:", err)
+        }
+    })
     return db
 }
