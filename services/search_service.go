@@ -372,7 +372,7 @@ func (s *SearchService) searchElk(query string, sourceType string) ([]models.Sea
     defer resp.Body.Close()
 
     body, _ := ioutil.ReadAll(resp.Body)
-    fmt.Printf("Data di ELK: %s\n", string(body))
+    //fmt.Printf("Data di ELK: %s\n", string(body))
 
     var result map[string]interface{}
     json.Unmarshal(body, &result)
