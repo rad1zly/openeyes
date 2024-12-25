@@ -27,15 +27,15 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
 
     searchType := "name"
     if isNIK(query) {
-        searchType = "nik" 
+        searchType = "nik"
     } else if isPhone(query) {
         searchType = "phone"
     }
 
-    // Cari di ELK dulu
+    // Cari di ELK
     elkResults, _ := s.searchElk(query, searchType)
     if len(elkResults) > 0 {
-        fmt.Printf("\n🔍 Data ditemukan di ELK\n")
+        fmt.Println("Data ditemukan di ELK")
         // Masukkan hasil sesuai sumbernya
         for _, result := range elkResults {
             switch result.Source {
@@ -50,6 +50,7 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
         return response, nil
     }
  
+    fmt.Println("Mencari di API eksternal...")
     // Untuk pencarian nama
     if !isNIK(query) && !isPhone(query) {
         // Cari di Leakosint
@@ -334,6 +335,19 @@ func (s *SearchService) TestElkConnection() error {
 }
 
 func (s *SearchService) searchElk(query string, sourceType string) ([]models.SearchResult, error) {
+    indexName := fmt.Sprintf("%s_data", sourceType)
+    
+    // Check if index exists
+    req, _ := http.NewRequest("HEAD", fmt.Sprintf("%s/%s", s.config.ElasticsearchURL, indexName), nil)
+    req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
+    
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil || resp.StatusCode == 404 {
+        fmt.Printf("Index %s tidak ditemukan, lanjut ke API\n", indexName)
+        return nil, nil // Return nil agar lanjut ke API search
+    }
+
     searchQuery := map[string]interface{}{
         "query": map[string]interface{}{
             "match_all": map[string]interface{}{},
