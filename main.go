@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"openeyes/config"
 	"openeyes/controllers"
 	"openeyes/services"
@@ -55,11 +54,12 @@ func main() {
 	api := r.Group("/api")
 	{
 		api.GET("/search", searchController.Search)
-		http.HandleFunc("/login", handlers.LoginHandler)
-    	http.HandleFunc("/logout", handlers.LogoutHandler)
-    	http.HandleFunc("/create-user", handlers.CreateUserHandler)
-    	http.HandleFunc("/reset-password", handlers.ResetPasswordHandler)
-    	http.HandleFunc("/change-password", handlers.ChangePasswordHandler)
+		api.POST("/login", handlers.LoginHandler)
+    	api.POST("/logout", handlers.LogoutHandler)
+    	api.POST("/create-user", handlers.CreateUserHandler)
+    	api.POST("/reset-password", handlers.ResetPasswordHandler)
+    	api.POST("/change-password", handlers.ChangePasswordHandler)
+		api.POST("/delete-user", handlers.DeleteUserHandler)
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(200, gin.H{"status": "ok"})
 		})

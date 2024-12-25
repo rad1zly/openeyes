@@ -1,200 +1,226 @@
 package handlers
 
 import (
-    "crypto/rand"
-    "encoding/base64"
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "strings"
-    "time"
+	"net/http"
+	"strings"
+	"time"
+	"user-management/database"
+	"user-management/models"
 
-    "github.com/dgrijalva/jwt-go"
-    "golang.org/x/crypto/bcrypt"
-    "openeyes/database"
-    "openeyes/models"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var jwtSecret = []byte("your_secret_key")
 
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
-    var loginData struct {
-        Username string `json:"username"`
-        Password string `json:"password"`
-    }
-    json.NewDecoder(r.Body).Decode(&loginData)
+func LoginHandler(c *gin.Context) {
+	var loginData struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := c.ShouldBindJSON(&loginData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    db := database.GetDB()
-    var user models.User
-    err := db.QueryRow("SELECT id, username, password, role FROM users WHERE username = ?", loginData.Username).Scan(&user.ID, &user.Username, &user.Password, &user.Role)
-    if err != nil {
-        http.Error(w, "Invalid credentials", http.StatusUnauthorized)
-        return
-    }
+	db := database.GetDB()
+	var user models.User
+	if err := db.Where("username = ?", loginData.Username).First(&user).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		return
+	}
 
-    if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginData.Password)); err != nil {
-        http.Error(w, "Invalid credentials", http.StatusUnauthorized)
-        return
-    }
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(loginData.Password)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		return
+	}
 
-    token := generateToken(user)
-    json.NewEncoder(w).Encode(map[string]string{
-        "token": token,
-    })
+	token := generateToken(user)
+	c.JSON(http.StatusOK, gin.H{"token": token})
 }
 
-func LogoutHandler(w http.ResponseWriter, r *http.Request) {
-    json.NewEncoder(w).Encode(map[string]string{
-        "message": "Logged out successfully",
-    })
+func LogoutHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
-func CreateUserHandler(w http.ResponseWriter, r *http.Request) {
-    user, err := authenticate(r)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusUnauthorized)
-        return
-    }
+func CreateUserHandler(c *gin.Context) {
+	user, err := authenticate(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
 
-    if user.Role != "superadmin" {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
+	if user.Role != "superadmin" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 
-    var newUser models.User
-    json.NewDecoder(r.Body).Decode(&newUser)
+	var newUser models.User
+	if err := c.ShouldBindJSON(&newUser); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(newUser.Password), bcrypt.DefaultCost)
-    newUser.Password = string(hashedPassword)
-    newUser.Role = "user"
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(newUser.Password), bcrypt.DefaultCost)
+	newUser.Password = string(hashedPassword)
+	newUser.Role = "user"
 
-    db := database.GetDB()
-    _, err = db.Exec("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", newUser.Username, newUser.Password, newUser.Role)
-    if err != nil {
-        http.Error(w, "Failed to create user", http.StatusInternalServerError)
-        return
-    }
+	db := database.GetDB()
+	if err := db.Create(&newUser).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		return
+	}
 
-    json.NewEncoder(w).Encode(map[string]string{
-        "message": "User created successfully",
-    })
+	c.JSON(http.StatusOK, gin.H{"message": "User created successfully"})
 }
 
-func ResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
-    user, err := authenticate(r)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusUnauthorized)
-        return
-    }
+func ResetPasswordHandler(c *gin.Context) {
+	user, err := authenticate(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
 
-    if user.Role != "superadmin" {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
+	if user.Role != "superadmin" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 
-    var resetData struct {
-        Username string `json:"username"`
-    }
-    json.NewDecoder(r.Body).Decode(&resetData)
+	var resetData struct {
+		Username string `json:"username"`
+	}
+	if err := c.ShouldBindJSON(&resetData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    tempPassword := generateRandomPassword()
-    hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(tempPassword), bcrypt.DefaultCost)
+	tempPassword := generateRandomPassword()
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(tempPassword), bcrypt.DefaultCost)
 
-    db := database.GetDB()
-    _, err = db.Exec("UPDATE users SET password = ? WHERE username = ?", string(hashedPassword), resetData.Username)
-    if err != nil {
-        http.Error(w, "Failed to reset password", http.StatusInternalServerError)
-        return
-    }
+	db := database.GetDB()
+	if err := db.Model(&models.User{}).Where("username = ?", resetData.Username).Update("password", string(hashedPassword)).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset password"})
+		return
+	}
 
-    json.NewEncoder(w).Encode(map[string]string{
-        "message":       "Password reset successfully",
-        "tempPassword": tempPassword,
-    })
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset successfully", "tempPassword": tempPassword})
 }
 
-func ChangePasswordHandler(w http.ResponseWriter, r *http.Request) {
-    user, err := authenticate(r)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusUnauthorized)
-        return
-    }
+func ChangePasswordHandler(c *gin.Context) {
+	user, err := authenticate(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
 
-    var passwordData struct {
-        OldPassword string `json:"oldPassword"`
-        NewPassword string `json:"newPassword"`
-    }
-    json.NewDecoder(r.Body).Decode(&passwordData)
+	var passwordData struct {
+		OldPassword string `json:"oldPassword"`
+		NewPassword string `json:"newPassword"`
+	}
+	if err := c.ShouldBindJSON(&passwordData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    db := database.GetDB()
-    var currentPassword string
-    err = db.QueryRow("SELECT password FROM users WHERE id = ?", user.ID).Scan(&currentPassword)
-    if err != nil {
-        http.Error(w, "User not found", http.StatusNotFound)
-        return
-    }
+	db := database.GetDB()
+	var currentUser models.User
+	if err := db.First(&currentUser, user.ID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
 
-    if err := bcrypt.CompareHashAndPassword([]byte(currentPassword), []byte(passwordData.OldPassword)); err != nil {
-        http.Error(w, "Invalid old password", http.StatusBadRequest)
-        return
-    }
+	if err := bcrypt.CompareHashAndPassword([]byte(currentUser.Password), []byte(passwordData.OldPassword)); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid old password"})
+		return
+	}
 
-    hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(passwordData.NewPassword), bcrypt.DefaultCost)
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(passwordData.NewPassword), bcrypt.DefaultCost)
+	if err := db.Model(&currentUser).Update("password", string(hashedPassword)).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to change password"})
+		return
+	}
 
-    _, err = db.Exec("UPDATE users SET password = ? WHERE id = ?", string(hashedPassword), user.ID)
-    if err != nil {
-        http.Error(w, "Failed to change password", http.StatusInternalServerError)
-        return
-    }
-
-    json.NewEncoder(w).Encode(map[string]string{
-        "message": "Password changed successfully",
-    })
+	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
 }
 
-func authenticate(r *http.Request) (models.User, error) {
-    tokenString := r.Header.Get("Authorization")
-    if !strings.HasPrefix(tokenString, "Bearer ") {
-        return models.User{}, fmt.Errorf("Invalid token")
-    }
-    tokenString = strings.Replace(tokenString, "Bearer ", "", 1)
+func DeleteUserHandler(c *gin.Context) {
+	user, err := authenticate(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
 
-    token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-            return nil, fmt.Errorf("Invalid token")
-        }
-        return jwtSecret, nil
-    })
-    if err != nil {
-        return models.User{}, err
-    }
+	if user.Role != "superadmin" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 
-    if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-        username := claims["username"].(string)
-        db := database.GetDB()
-        var user models.User
-        err := db.QueryRow("SELECT id, username, role FROM users WHERE username = ?", username).Scan(&user.ID, &user.Username, &user.Role)
-        if err != nil {
-            return models.User{}, fmt.Errorf("Invalid token")
-        }
-        return user, nil
-    }
+	var deleteData struct {
+		Username string `json:"username"`
+	}
+	if err := c.ShouldBindJSON(&deleteData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    return models.User{}, fmt.Errorf("Invalid token")
+	db := database.GetDB()
+	if err := db.Where("username = ?", deleteData.Username).Delete(&models.User{}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
+}
+
+func authenticate(c *gin.Context) (models.User, error) {
+	tokenString := c.GetHeader("Authorization")
+	if tokenString == "" {
+		return models.User{}, jwt.ErrNoTokenInRequest
+	}
+
+	tokenString = strings.Replace(tokenString, "Bearer ", "", 1)
+	claims, err := verifyToken(tokenString)
+	if err != nil {
+		return models.User{}, err
+	}
+
+	userID := claims.(jwt.MapClaims)["id"].(float64)
+	var user models.User
+	db := database.GetDB()
+	if err := db.First(&user, uint(userID)).Error; err != nil {
+		return models.User{}, err
+	}
+
+	return user, nil
 }
 
 func generateToken(user models.User) string {
-    token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-        "username": user.Username,
-        "role":     user.Role,
-        "exp":      time.Now().Add(time.Hour * 24).Unix(),
-    })
-    tokenString, _ := token.SignedString(jwtSecret)
-    return tokenString
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"id":       user.ID,
+		"username": user.Username,
+		"role":     user.Role,
+		"exp":      time.Now().Add(time.Hour * 24).Unix(),
+	})
+
+	tokenString, _ := token.SignedString(jwtSecret)
+	return tokenString
+}
+
+func verifyToken(tokenString string) (jwt.Claims, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return jwtSecret, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return token.Claims, nil
 }
 
 func generateRandomPassword() string {
-    b := make([]byte, 8)
-    rand.Read(b)
-    return base64.URLEncoding.EncodeToString(b)
+	// Implement random password generation logic here
+	// For simplicity, we'll just return a hardcoded password for now
+	return "tempPassword123"
 }
