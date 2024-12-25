@@ -15,7 +15,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-jwtSecret := GenerateSecretKey()
+jwtSecret, err := GenerateSecretKey()
+if err != nil {
+    log.Fatal(err)
+}
 
 func GenerateSecretKey() (string, error) {
 	// Generate random 32 byte key
