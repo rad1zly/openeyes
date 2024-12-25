@@ -62,7 +62,7 @@ func main() {
     	api.POST("/reset-password", handlers.ResetPasswordHandler)
     	api.POST("/change-password", handlers.ChangePasswordHandler)
 		api.POST("/delete-user", handlers.DeleteUserHandler)
-		api.GET("/api/getall-users", handlers.GetAllUsersHandler)
+		api.GET("/getall-users", handlers.GetAllUsersHandler)
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(200, gin.H{"status": "ok"})
 		})
