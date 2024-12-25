@@ -15,7 +15,7 @@ func main() {
 	// Load configuration
 	cfg := config.LoadConfig()
 
-	db, err := database.initDB()
+	db, err := database.InitDB()
     if err != nil {
         fmt.Printf("Failed to initialize database:", err)
     }

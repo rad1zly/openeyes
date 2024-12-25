@@ -16,7 +16,7 @@ var (
     once sync.Once
 )
 
-func initDB() {
+func InitDB() {
     err := godotenv.Load()
     if err != nil {
         log.Fatal("Error loading .env file")
@@ -43,6 +43,6 @@ func initDB() {
 }
 
 func GetDB() *sql.DB {
-    once.Do(initDB)
+    once.Do(InitDB)
     return db
 }
