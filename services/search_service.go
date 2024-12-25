@@ -343,28 +343,65 @@ func (s *SearchService) searchElk(query string, sourceType string) ([]models.Sea
                 "should": []map[string]interface{}{
                     {
                         "match": map[string]interface{}{
-                            "data.FullName": query,
+                            "data.Data.FullName": query,
                         },
                     },
                     {
                         "match": map[string]interface{}{
-                            "data.Email": query,
+                            "data.Data.Phone": query,
                         },
                     },
                     {
                         "match": map[string]interface{}{
-                            "data.Phone": query,
-                        },
-                    },
-                    {
-                        "match": map[string]interface{}{
-                            "data.NIK": query,
+                            "data.Data.Passport": query,
                         },
                     },
                 },
             },
         },
     }
+
+    url := fmt.Sprintf("%s/%s/_search", s.config.ElasticsearchURL, indexName)
+    fmt.Printf("Mencari di index: %s\n", url)
+
+    jsonData, _ := json.Marshal(searchQuery)
+    req, _ := http.NewRequest("GET", url, bytes.NewBuffer(jsonData))
+    req.Header.Set("Content-Type", "application/json")
+    req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, err
+    }
+    defer resp.Body.Close()
+
+    body, _ := ioutil.ReadAll(resp.Body)
+    fmt.Printf("Data di ELK: %s\n", string(body))
+
+    var result map[string]interface{}
+    json.Unmarshal(body, &result)
+
+    var searchResults []models.SearchResult
+    if hits, ok := result["hits"].(map[string]interface{}); ok {
+        if hitsList, ok := hits["hits"].([]interface{}); ok {
+            for _, hit := range hitsList {
+                if hitMap, ok := hit.(map[string]interface{}); ok {
+                    if source, ok := hitMap["_source"].(map[string]interface{}); ok {
+                        searchResults = append(searchResults, models.SearchResult{
+                            ID:        source["id"].(string),
+                            Source:    source["source"].(string),
+                            Data:      source["data"],
+                            Timestamp: time.Now(),
+                        })
+                    }
+                }
+            }
+        }
+    }
+
+    return searchResults, nil
+}
 
     url := fmt.Sprintf("%s/%s/_search", s.config.ElasticsearchURL, indexName)
     fmt.Printf("Mencari di index: %s\n", url)
