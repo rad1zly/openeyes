@@ -15,7 +15,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var jwtSecret = []byte("50128793515ef24d06d59540b64f57df2866b169b3eceeebff5bcee488b446935fe0d60103e83054ddc196a31045907cc9cf2a20914dd68f68a1fc25cba26f71eb1b59999ce8292720f96e5be88920cdc50dcc2da0965f20dbeda59058a1c4e8429346aa180bb3b36fb1cd4eedd9d675c7cf701cc3fe075a536021618d5ce2cb93128894df7abaee518043e1fe43e79e8918bb4e3dfdb4b0799e53e2364e3540aab2e7f59d3979b1a1aeb3d8fa63aa3121ad68a5cd491fd0535639b9c31dc3dfbd05e27c02937801cf8351ba0165968d25c975b1bcfac7bcd543a61e385a91248049de9adae3049c0c5153a4c42130a5606fde89dbd484a9ca251f16ed015b98")
+key := make([]byte, 32)
+if _, err := rand.Read(key); err != nil {
+    panic(err)
+}
+jwtSecret := key
 
 func LoginHandler(c *gin.Context) {
 	var loginData struct {
