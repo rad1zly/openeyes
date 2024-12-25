@@ -277,7 +277,7 @@ func (s *SearchService) saveToElk(result models.SearchResult, sourceType string)
 
     // Generate ID jika kosong
     if result.ID == "" {
-        result.ID = fmt.Sprintf("%s_%d", result.Source, time.Now().UnixNano())
+        result.ID = fmt.Sprintf("%s_%d", time.Now().UnixNano())
     }
 
     // Pastikan semua field terisi
@@ -285,7 +285,7 @@ func (s *SearchService) saveToElk(result models.SearchResult, sourceType string)
         "id":        result.ID,
         "source":    result.Source,
         "data":      result.Data,
-        "timestamp": time.Now(),
+       // "timestamp": time.Now(),
     }
 
     // Debug print
@@ -358,17 +358,17 @@ func (s *SearchService) TestElkConnection() error {
 }
 
 func (s *SearchService) searchElk(query string, searchType string) ([]models.SearchResult, error) {
-    var results []models.SearchResult
-    
-    // Tentukan index mana yang perlu dicari berdasarkan tipe pencarian
-    var indexes []string
-    if searchType == "name" {
-        indexes = []string{"leakosint_data", "linkedin_data"}
-    } else if searchType == "phone" {
-        indexes = []string{"leakosint_data", "truecaller_data"}
-    } else if searchType == "nik" {
-        indexes = []string{"leakosint_data"}
+    var indexesToSearch []string
+    switch searchType {
+    case "name":
+        indexesToSearch = []string{"leakosint_data", "linkedin_data"}
+    case "phone":
+        indexesToSearch = []string{"leakosint_data", "truecaller_data"}
+    case "nik":
+        indexesToSearch = []string{"leakosint_data"}
     }
+
+    var allResults []models.SearchResult
 
     // Cari di setiap index yang sesuai
     for _, indexName := range indexes {
@@ -446,7 +446,7 @@ func (s *SearchService) searchElk(query string, searchType string) ([]models.Sea
         }
     }
 
-    return results, nil
+    return allResults, nil
 }
 
 //  func getSearchFields(sourceType string) []string {
