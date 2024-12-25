@@ -40,7 +40,7 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
         fmt.Printf("ELK Results: %+v\n", elkResults)
 
         // Response langsung dari data ELK
-        response.ElkSearchResults = elkResults
+        response.LeakosintResults = elkResults
         return response, nil
     }
 
@@ -318,7 +318,7 @@ func (s *SearchService) TestElkConnection() error {
     return nil
 }
 
-func (s *SearchService) searchElk(query string, sourceType string) ([]models.ElkSearchResponse, error) {
+func (s *SearchService) searchElk(query string, sourceType string) ([]models.SearchResult, error) {
     indexName := fmt.Sprintf("%s_data", sourceType)
     
     // Check index exists
@@ -387,13 +387,13 @@ func (s *SearchService) searchElk(query string, sourceType string) ([]models.Elk
     var result map[string]interface{}
     json.Unmarshal(body, &result)
 
-    var searchResults []models.ElkSearchResponse
+    var searchResults []models.SearchResult
     if hits, ok := result["hits"].(map[string]interface{}); ok {
         if hitsList, ok := hits["hits"].([]interface{}); ok {
             for _, hit := range hitsList {
                 if hitMap, ok := hit.(map[string]interface{}); ok {
                     if source, ok := hitMap["_source"].(map[string]interface{}); ok {
-                        searchResults = append(searchResults, models.ElkSearchResponse{
+                        searchResults = append(searchResults, models.SearchResult{
                             ID:        source["id"].(string),
                             Source:    source["source"].(string),
                             Data:      source["data"],
