@@ -16,7 +16,7 @@ var (
     once sync.Once
 )
 
-func InitDB() {
+func InitDB() (*sql.DB, error) {
     err := godotenv.Load()
     if err != nil {
         log.Fatal("Error loading .env file")
@@ -29,17 +29,18 @@ func InitDB() {
     dbName := os.Getenv("DB_NAME")
 
     connectionString := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
-    db, err = sql.Open("mysql", connectionString)
+    db, err := sql.Open("mysql", connectionString)
     if err != nil {
-        log.Fatal(err)
+        return nil, err
     }
 
     err = db.Ping()
     if err != nil {
-        log.Fatal(err)
+        return nil, err
     }
 
     log.Println("Connected to the database")
+    return db, nil
 }
 
 func GetDB() *sql.DB {
