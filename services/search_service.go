@@ -114,7 +114,8 @@ func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, er
     }
 
     var results []models.SearchResult
-    if list, ok := apiResponse["List"].(map[string]interface{}); ok {
+    for source, sourceData := range leakosintResp.List {
+        fmt.Printf("Processing Leakosint data - Source: %s\n", source) // Debug
         for _, data := range sourceData.Data {
             result := models.SearchResult{
                 ID:        fmt.Sprintf("leakosint_%d", time.Now().UnixNano()),
@@ -122,7 +123,7 @@ func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, er
                 Data:      data,
                 Timestamp: time.Now(),
             }
-
+            results = append(results, result)
         }
     }
 
