@@ -15,11 +15,21 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-key := make([]byte, 32)
-if _, err := rand.Read(key); err != nil {
-    panic(err)
-}
-jwtSecret := key
+jwtSecret := GenerateSecretKey()
+
+func GenerateSecretKey() (string, error) {
+	// Generate random 32 byte key
+	key := make([]byte, 32)
+	_, err := rand.Read(key)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random key: %v", err)
+	}
+	
+	// Convert to base64 string untuk memudahkan penyimpanan
+	secretKey := base64.StdEncoding.EncodeToString(key)
+	
+	return secretKey, nil
+ }
 
 func LoginHandler(c *gin.Context) {
 	var loginData struct {
