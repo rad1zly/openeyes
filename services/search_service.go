@@ -343,6 +343,16 @@ func (s *SearchService) searchElk(query string, sourceType string) ([]models.Sea
                     },
                     {
                         "match": map[string]interface{}{
+                            "data.Data.full_name": query,
+                        },
+                    },
+                    {
+                        "match": map[string]interface{}{
+                            "data.phoneInfo.e164Format": query,
+                        },
+                    },
+                    {
+                        "match": map[string]interface{}{
                             "data.Data.Phone": query,
                         },
                     },
