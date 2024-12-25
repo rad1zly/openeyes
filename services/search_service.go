@@ -274,6 +274,9 @@ func (s *SearchService) saveToElk(result models.SearchResult, sourceType string)
         indexName = "truecaller_data"
     }
 
+    fmt.Printf("\n💾 Menyimpan ke index: %s\n", indexName)
+    fmt.Printf("Source: %s, Data: %+v\n", result.Source, result)
+
     documentData := map[string]interface{}{
         "id":        result.ID,
         "source":    result.Source,
@@ -283,12 +286,16 @@ func (s *SearchService) saveToElk(result models.SearchResult, sourceType string)
 
     jsonData, err := json.Marshal(documentData)
     if err != nil {
+        fmt.Printf("❌ Error saat marshal data: %v\n", err)
         return fmt.Errorf("error marshaling data: %v", err)
     }
 
     url := fmt.Sprintf("%s/%s/_doc", s.config.ElasticsearchURL, indexName)
+    fmt.Printf("URL: %s\n", url)
+
     req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
     if err != nil {
+        fmt.Printf("❌ Error saat membuat request: %v\n", err)
         return err
     }
 
@@ -298,11 +305,20 @@ func (s *SearchService) saveToElk(result models.SearchResult, sourceType string)
     client := &http.Client{}
     resp, err := client.Do(req)
     if err != nil {
+        fmt.Printf("❌ Error saat mengirim request: %v\n", err)
         return err
     }
     defer resp.Body.Close()
 
-    fmt.Printf("Saved to ELK - Source: %s, Index: %s\n", result.Source, indexName)
+    body, _ := ioutil.ReadAll(resp.Body)
+    fmt.Printf("Response dari ELK: %s\n", string(body))
+
+    if resp.StatusCode >= 400 {
+        fmt.Printf("❌ Error status code: %d\n", resp.StatusCode)
+        return fmt.Errorf("error saving to elk: status code %d", resp.StatusCode)
+    }
+
+    fmt.Printf("✅ Berhasil disimpan ke ELK - Index: %s\n", indexName)
     return nil
 }
 
