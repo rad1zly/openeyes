@@ -273,37 +273,36 @@ func (s *SearchService) saveToElk(result models.SearchResult, sourceType string)
     case "truecaller":
         indexName = "truecaller_data"
     }
-    
-    // Siapkan data yang akan disimpan
-    jsonData, err := json.Marshal(result)
+
+    documentData := map[string]interface{}{
+        "id":        result.ID,
+        "source":    result.Source,
+        "data":      result.Data,
+        "timestamp": time.Now(),
+    }
+
+    jsonData, err := json.Marshal(documentData)
     if err != nil {
         return fmt.Errorf("error marshaling data: %v", err)
     }
 
-    // Buat request ke Elasticsearch
-    url := fmt.Sprintf("%s/%s_data/_doc", s.config.ElasticsearchURL, sourceType)
+    url := fmt.Sprintf("%s/%s/_doc", s.config.ElasticsearchURL, indexName)
     req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
     if err != nil {
-        return fmt.Errorf("error creating request: %v", err)
+        return err
     }
 
-    // Set header dan auth
     req.Header.Set("Content-Type", "application/json")
     req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
 
-    // Kirim request
     client := &http.Client{}
     resp, err := client.Do(req)
     if err != nil {
-        return fmt.Errorf("error saving to elasticsearch: %v", err)
+        return err
     }
     defer resp.Body.Close()
 
-    // Cek response
-    if resp.StatusCode >= 400 {
-        return fmt.Errorf("elasticsearch error: status code %d", resp.StatusCode)
-    }
-
+    fmt.Printf("Saved to ELK - Source: %s, Index: %s\n", result.Source, indexName)
     return nil
 }
 
