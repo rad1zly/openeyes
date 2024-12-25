@@ -52,16 +52,18 @@ func main() {
 	// Routes
 	api := r.Group("/api")
 	{
-		api.GET("/login", handlers.LoginHandler)
-    	api.GET("/logout", handlers.LogoutHandler)
-    	api.GET("/create-user", handlers.CreateUserHandler)
-        api.GET("/reset-password", handlers.ResetPasswordHandler)
-    	api.GET("/change-password", handlers.ChangePasswordHandler)
 		api.GET("/search", searchController.Search)
+		http.HandleFunc("/login", handlers.LoginHandler)
+    	http.HandleFunc("/logout", handlers.LogoutHandler)
+    	http.HandleFunc("/create-user", handlers.CreateUserHandler)
+    	http.HandleFunc("/reset-password", handlers.ResetPasswordHandler)
+    	http.HandleFunc("/change-password", handlers.ChangePasswordHandler)
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(200, gin.H{"status": "ok"})
 		})
 	}
+	
+
 
 	// Start server
 	r.Run(":8080")
