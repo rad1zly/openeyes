@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	"user-management/database"
-	"user-management/models"
+	"openeyes/database"
+	"openeyes/models"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
