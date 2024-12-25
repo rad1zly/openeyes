@@ -343,7 +343,7 @@ func (s *SearchService) searchElk(query string, sourceType string) ([]models.Sea
                     },
                     {
                         "match": map[string]interface{}{
-                            "data.Data.full_name": query,
+                            "data.full_name": query,
                         },
                     },
                     {
