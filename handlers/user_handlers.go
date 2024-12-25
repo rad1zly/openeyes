@@ -3,8 +3,6 @@ package handlers
 import (
     "crypto/rand"
 	"math/big"
-//	"encoding/base64"
-//	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -242,4 +240,51 @@ func generateRandomPassword() string {
     }
 
     return string(password)
+}
+
+func GetAllUsersHandler(c *gin.Context) {
+    // Cek autentikasi
+    user, err := authenticate(c)
+    if err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+        return
+    }
+
+    // Cek role superadmin
+    if user.Role != "superadmin" {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+        return
+    }
+
+    // Get database connection
+    db := database.GetDB()
+
+    // Get all users from database
+    rows, err := db.Query("SELECT id, username, role FROM users")
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
+        return
+    }
+    defer rows.Close()
+
+    var users []models.User
+    for rows.Next() {
+        var user models.User
+        if err := rows.Scan(&user.ID, &user.Username, &user.Role); err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan user data"})
+            return
+        }
+        users = append(users, user)
+    }
+
+    // Check for errors from iterating over rows
+    if err = rows.Err(); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Error iterating users"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "message": "Users retrieved successfully",
+        "data": users,
+    })
 }
