@@ -333,18 +333,19 @@ func (s *SearchService) TestElkConnection() error {
 }
 
 func (s *SearchService) searchElk(query string, searchType string) ([]models.SearchResult, error) {
-    var indexesToSearch []string
+    // Tentukan index yang akan dicari berdasarkan tipe pencarian
+    var indexes []string
     switch searchType {
     case "name":
-        indexesToSearch = []string{"leakosint_data", "linkedin_data"}
+        indexes = []string{"leakosint_data", "linkedin_data"}
     case "phone":
-        indexesToSearch = []string{"leakosint_data", "truecaller_data"}
+        indexes = []string{"leakosint_data", "truecaller_data"}
     case "nik":
-        indexesToSearch = []string{"leakosint_data"}
+        indexes = []string{"leakosint_data"}
     }
 
-    var allResults []models.SearchResult
-
+    var searchResults []models.SearchResult
+    
     // Cari di setiap index yang sesuai
     for _, indexName := range indexes {
         // Check if index exists
@@ -369,7 +370,17 @@ func (s *SearchService) searchElk(query string, searchType string) ([]models.Sea
                         },
                         {
                             "match": map[string]interface{}{
+                                "data.full_name": query,
+                            },
+                        },
+                        {
+                            "match": map[string]interface{}{
                                 "data.Data.Phone": query,
+                            },
+                        },
+                        {
+                            "match": map[string]interface{}{
+                                "data.Data.phoneInfo.e164Format": query,
                             },
                         },
                         {
@@ -382,7 +393,6 @@ func (s *SearchService) searchElk(query string, searchType string) ([]models.Sea
             },
         }
 
-        // Search di index ini
         url := fmt.Sprintf("%s/%s/_search", s.config.ElasticsearchURL, indexName)
         fmt.Printf("Mencari di index: %s\n", url)
 
@@ -398,22 +408,23 @@ func (s *SearchService) searchElk(query string, searchType string) ([]models.Sea
         }
         defer resp.Body.Close()
 
+        body, _ := ioutil.ReadAll(resp.Body)
+        fmt.Printf("Data di ELK: %s\n", string(body))
+
         var result map[string]interface{}
-        json.NewDecoder(resp.Body).Decode(&result)
+        json.Unmarshal(body, &result)
 
         if hits, ok := result["hits"].(map[string]interface{}); ok {
             if hitsList, ok := hits["hits"].([]interface{}); ok {
                 for _, hit := range hitsList {
                     if hitMap, ok := hit.(map[string]interface{}); ok {
                         if source, ok := hitMap["_source"].(map[string]interface{}); ok {
-                            // Append ke results sesuai source nya
-                            searchResult := models.SearchResult{
+                            searchResults = append(searchResults, models.SearchResult{
                                 ID:        source["id"].(string),
                                 Source:    source["source"].(string),
                                 Data:      source["data"],
                                 Timestamp: time.Now(),
-                            }
-                            results = append(results, searchResult)
+                            })
                         }
                     }
                 }
@@ -421,18 +432,5 @@ func (s *SearchService) searchElk(query string, searchType string) ([]models.Sea
         }
     }
 
-    return allResults, nil
+    return searchResults, nil
 }
-
-//  func getSearchFields(sourceType string) []string {
-//     switch sourceType {
-//     case "name":
-//         return []string{"Data.FullName", "Data.Email", "Data.Name.FullName"} 
-//     case "phone":
-//         return []string{"Data.Phone", "Data.phoneInfo.e164Format"}
-//     case "nik":
-//         return []string{"Data.NIK", "Data.Passport"}
-//     default:
-//         return []string{"Data.*"}
-//     }
-//  }
