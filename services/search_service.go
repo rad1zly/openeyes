@@ -337,7 +337,7 @@ func (s *SearchService) TestElkConnection() error {
 func (s *SearchService) searchElk(query string, sourceType string) ([]models.SearchResult, error) {
     indexName := fmt.Sprintf("%s_data", sourceType)
     
-    // Check if index exists
+    // Check index
     reqCheck, _ := http.NewRequest("HEAD", fmt.Sprintf("%s/%s", s.config.ElasticsearchURL, indexName), nil)
     reqCheck.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
     
@@ -347,96 +347,30 @@ func (s *SearchService) searchElk(query string, sourceType string) ([]models.Sea
         fmt.Printf("Index %s tidak ditemukan, lanjut ke API\n", indexName)
         return nil, nil
     }
- 
-    var searchQuery map[string]interface{}
-    
-    // Query berbeda untuk setiap tipe
-    switch sourceType {
-    case "name":
-        searchQuery = map[string]interface{}{
-            "query": map[string]interface{}{
-                "bool": map[string]interface{}{
-                    "should": []map[string]interface{}{
-                        {
-                            "match": map[string]interface{}{
-                                "Data.FullName": query,
-                            },
-                        },
-                        {
-                            "match": map[string]interface{}{
-                                "Data.Email": query,
-                            },
-                        },
-                        {
-                            "match": map[string]interface{}{
-                                "Data.Name.FullName": query,
-                            },
-                        },
-                    },
-                },
-            },
-            "size": 10,
-        }
-    case "phone":
-        searchQuery = map[string]interface{}{
-            "query": map[string]interface{}{
-                "bool": map[string]interface{}{
-                    "should": []map[string]interface{}{
-                        {
-                            "match": map[string]interface{}{
-                                "Data.Phone": query,
-                            },
-                        },
-                        {
-                            "match": map[string]interface{}{
-                                "Data.phoneInfo.e164Format": query,
-                            },
-                        },
-                    },
-                },
-            },
-            "size": 10,
-        }
-    case "nik":
-        searchQuery = map[string]interface{}{
-            "query": map[string]interface{}{
-                "bool": map[string]interface{}{
-                    "should": []map[string]interface{}{
-                        {
-                            "match": map[string]interface{}{
-                                "Data.NIK": query,
-                            },
-                        },
-                        {
-                            "match": map[string]interface{}{
-                                "Data.Passport": query,
-                            },
-                        },
-                    },
-                },
-            },
-            "size": 10,
-        }
+
+    // Coba lihat data yang tersimpan dulu
+    searchQuery := map[string]interface{}{
+        "query": map[string]interface{}{
+            "match_all": map[string]interface{}{},
+        },
+        "size": 10,
     }
- 
-    fmt.Printf("Query Type: %s\n", sourceType)
-    fmt.Printf("Query: %+v\n", searchQuery)
- 
-    url := fmt.Sprintf("%s/%s", s.config.ElasticsearchURL, indexName) + "/_search"
-    fmt.Printf("Mencari di index: %s\n", url)
- 
+
+    url := fmt.Sprintf("%s/%s/_search", s.config.ElasticsearchURL, indexName)
+    fmt.Printf("Mencari semua data di index: %s\n", url)
+
     jsonData, _ := json.Marshal(searchQuery)
     req, _ := http.NewRequest("GET", url, bytes.NewBuffer(jsonData))
     req.Header.Set("Content-Type", "application/json")
     req.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
- 
+
     client := &http.Client{}
     resp, err := client.Do(req)
     if err != nil {
         return nil, err
     }
     defer resp.Body.Close()
- 
+
     body, _ := ioutil.ReadAll(resp.Body)
     fmt.Printf("Data di ELK: %s\n", string(body))
  
