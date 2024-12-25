@@ -263,7 +263,6 @@ func isPhone(query string) bool {
 }
 
 func (s *SearchService) saveToElk(result models.SearchResult, sourceType string) error {
-    // Index sesuai sumbernya
     var indexName string
     switch result.Source {
     case "leakosint":
@@ -275,14 +274,23 @@ func (s *SearchService) saveToElk(result models.SearchResult, sourceType string)
     }
 
     fmt.Printf("\n💾 Menyimpan ke index: %s\n", indexName)
-    fmt.Printf("Source: %s, Data: %+v\n", result.Source, result)
 
+    // Generate ID jika kosong
+    if result.ID == "" {
+        result.ID = fmt.Sprintf("%s_%d", result.Source, time.Now().UnixNano())
+    }
+
+    // Pastikan semua field terisi
     documentData := map[string]interface{}{
         "id":        result.ID,
         "source":    result.Source,
         "data":      result.Data,
         "timestamp": time.Now(),
     }
+
+    // Debug print
+    jsonDataBytes, _ := json.MarshalIndent(documentData, "", "  ")
+    fmt.Printf("Data yang akan disimpan:\n%s\n", string(jsonDataBytes))
 
     jsonData, err := json.Marshal(documentData)
     if err != nil {
@@ -291,8 +299,6 @@ func (s *SearchService) saveToElk(result models.SearchResult, sourceType string)
     }
 
     url := fmt.Sprintf("%s/%s/_doc", s.config.ElasticsearchURL, indexName)
-    fmt.Printf("URL: %s\n", url)
-
     req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
     if err != nil {
         fmt.Printf("❌ Error saat membuat request: %v\n", err)
