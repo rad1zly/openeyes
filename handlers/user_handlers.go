@@ -15,7 +15,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var jwtSecret = []byte("89302666a7b09cd4426b5997a9d6c6cd11e052084886db20ea6acd5ee55fbe57")
+var jwtSecret = []byte("abclimadasarapakahkamutahu")
 
 func LoginHandler(c *gin.Context) {
 	var loginData struct {
