@@ -32,89 +32,78 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
         searchType = "phone"
     }
 
-    // Cari di ELK
+    // Cari di ELK dulu
     elkResults, _ := s.searchElk(query, searchType)
     if len(elkResults) > 0 {
-        fmt.Println("Data ditemukan di ELK")
-        // Masukkan hasil sesuai sumbernya
+        fmt.Printf("\n🔍 Data ditemukan di ELK\n")
         for _, result := range elkResults {
             switch result.Source {
             case "leakosint":
                 response.LeakosintResults = append(response.LeakosintResults, result)
             case "linkedin":
-                response.LinkedinResults = append(response.LinkedinResults, result)  
+                response.LinkedinResults = append(response.LinkedinResults, result)
             case "truecaller":
                 response.TruecallerResults = append(response.TruecallerResults, result)
             }
         }
         return response, nil
     }
- 
-    fmt.Println("Mencari di API eksternal...")
-    // Untuk pencarian nama
+
+    fmt.Printf("\n🔄 Data tidak ditemukan di ELK, mencari di API eksternal...\n")
+
+    // Jika tidak ada di ELK, cari di API eksternal
     if !isNIK(query) && !isPhone(query) {
-        // Cari di Leakosint
+        // Pencarian nama - cari di Leakosint dan LinkedIn
         leakResults, _ := s.searchLeakosint(query)
         if len(leakResults) > 0 {
             fmt.Printf("✅ Data ditemukan di Leakosint API\n")
             for _, result := range leakResults {
-                // Simpan hasil ke ELK
                 s.saveToElk(result, "name")
             }
             response.LeakosintResults = leakResults
         }
- 
-        // Cari di LinkedIn
+
         linkResults, _ := s.searchLinkedin(query)
         if len(linkResults) > 0 {
             fmt.Printf("✅ Data ditemukan di LinkedIn API\n")
             for _, result := range linkResults {
-                // Simpan hasil ke ELK 
                 s.saveToElk(result, "name")
             }
             response.LinkedinResults = linkResults
         }
- 
-    // Untuk pencarian NIK
     } else if isNIK(query) {
-        // Cari di Leakosint
+        // Pencarian NIK - cari di Leakosint
         leakResults, _ := s.searchLeakosint(query)
         if len(leakResults) > 0 {
             fmt.Printf("✅ Data ditemukan di Leakosint API\n")
             for _, result := range leakResults {
-                // Simpan hasil ke ELK
                 s.saveToElk(result, "nik")
             }
             response.LeakosintResults = leakResults
         }
- 
-    // Untuk pencarian nomor telepon
     } else if isPhone(query) {
-        // Cari di Leakosint
+        // Pencarian phone - cari di Leakosint dan Truecaller
         leakResults, _ := s.searchLeakosint(query)
         if len(leakResults) > 0 {
-            fmt.Printf("✅ Data ditemukan di leakosint API\n")
+            fmt.Printf("✅ Data ditemukan di Leakosint API\n")
             for _, result := range leakResults {
-                // Simpan hasil ke ELK
                 s.saveToElk(result, "phone")
             }
             response.LeakosintResults = leakResults
         }
- 
-        // Cari di Truecaller
+
         trueResults, _ := s.searchTruecaller(query)
         if len(trueResults) > 0 {
             fmt.Printf("✅ Data ditemukan di Truecaller API\n")
             for _, result := range trueResults {
-                // Simpan hasil ke ELK
                 s.saveToElk(result, "phone")
             }
             response.TruecallerResults = trueResults
         }
     }
- 
+
     return response, nil
- }
+}
 
 func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, error) {
     apiResponse, err := s.queryLeakosintAPI(query)
@@ -337,7 +326,7 @@ func (s *SearchService) TestElkConnection() error {
 func (s *SearchService) searchElk(query string, sourceType string) ([]models.SearchResult, error) {
     indexName := fmt.Sprintf("%s_data", sourceType)
     
-    // Check index
+    // Check index exists
     reqCheck, _ := http.NewRequest("HEAD", fmt.Sprintf("%s/%s", s.config.ElasticsearchURL, indexName), nil)
     reqCheck.SetBasicAuth(s.config.ElasticsearchUser, s.config.ElasticsearchPassword)
     
@@ -348,16 +337,37 @@ func (s *SearchService) searchElk(query string, sourceType string) ([]models.Sea
         return nil, nil
     }
 
-    // Coba lihat data yang tersimpan dulu
     searchQuery := map[string]interface{}{
         "query": map[string]interface{}{
-            "match_all": map[string]interface{}{},
+            "bool": map[string]interface{}{
+                "should": []map[string]interface{}{
+                    {
+                        "match": map[string]interface{}{
+                            "data.FullName": query,
+                        },
+                    },
+                    {
+                        "match": map[string]interface{}{
+                            "data.Email": query,
+                        },
+                    },
+                    {
+                        "match": map[string]interface{}{
+                            "data.Phone": query,
+                        },
+                    },
+                    {
+                        "match": map[string]interface{}{
+                            "data.NIK": query,
+                        },
+                    },
+                },
+            },
         },
-        "size": 10,
     }
 
     url := fmt.Sprintf("%s/%s/_search", s.config.ElasticsearchURL, indexName)
-    fmt.Printf("Mencari semua data di index: %s\n", url)
+    fmt.Printf("Mencari di index: %s\n", url)
 
     jsonData, _ := json.Marshal(searchQuery)
     req, _ := http.NewRequest("GET", url, bytes.NewBuffer(jsonData))
@@ -373,10 +383,10 @@ func (s *SearchService) searchElk(query string, sourceType string) ([]models.Sea
 
     body, _ := ioutil.ReadAll(resp.Body)
     fmt.Printf("Data di ELK: %s\n", string(body))
- 
+
     var result map[string]interface{}
     json.Unmarshal(body, &result)
- 
+
     var searchResults []models.SearchResult
     if hits, ok := result["hits"].(map[string]interface{}); ok {
         if hitsList, ok := hits["hits"].([]interface{}); ok {
@@ -384,17 +394,17 @@ func (s *SearchService) searchElk(query string, sourceType string) ([]models.Sea
                 if hitMap, ok := hit.(map[string]interface{}); ok {
                     if source, ok := hitMap["_source"].(map[string]interface{}); ok {
                         searchResults = append(searchResults, models.SearchResult{
-                            Source: source["Source"].(string),
-                            Data:   source["Data"],
+                            Source: source["source"].(string),
+                            Data:   source["data"],
                         })
                     }
                 }
             }
         }
     }
- 
+
     return searchResults, nil
- }
+}
 //  func getSearchFields(sourceType string) []string {
 //     switch sourceType {
 //     case "name":
