@@ -114,7 +114,7 @@ func (s *SearchService) searchLeakosint(query string) ([]models.SearchResult, er
     }
 
     var results []models.SearchResult
-    for source, sourceData := range leakosintResp.List {
+    for source, sourceData := range apiResponse.List {
         fmt.Printf("Processing Leakosint data - Source: %s\n", source) // Debug
         for _, data := range sourceData.Data {
             result := models.SearchResult{
