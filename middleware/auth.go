@@ -10,6 +10,12 @@ import (
 
 func AuthMiddleware() gin.HandlerFunc {
     return func(c *gin.Context) {
+        // Skip middleware untuk endpoint login
+        if c.FullPath() == "/api/login" {
+            c.Next()
+            return
+        }
+
         tokenString := c.GetHeader("Authorization")
         if tokenString == "" {
             c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization token not provided"})
@@ -27,7 +33,6 @@ func AuthMiddleware() gin.HandlerFunc {
 
         userID := uint(claims.(jwt.MapClaims)["id"].(float64))
         c.Set("userID", userID)
-
         c.Next()
     }
 }
