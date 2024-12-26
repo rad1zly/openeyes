@@ -18,7 +18,7 @@ func NewSearchController(searchService *services.SearchService) *SearchControlle
 	}
 }
 
-func (c *SearchController) Search(ctx *gin.Context) {
+func (c *SearchController) Search(ctx *gin.Context)(handlers.authenticate, error) {
 	_, err := authenticate(ctx)
     if err != nil {
         ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
