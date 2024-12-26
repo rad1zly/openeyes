@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var user models.user
+var user models.User
 type SearchController struct {
 	searchService *services.SearchService
 }
@@ -23,7 +23,7 @@ func NewSearchController(searchService *services.SearchService) *SearchControlle
 func (c *SearchController) Search(ctx *gin.Context) {
 	user, err := handlers.Authenticate(ctx)
     if err != nil {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+        ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
         return
     }
 
