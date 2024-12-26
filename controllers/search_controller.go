@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"openeyes/services"
 	"openeyes/handlers"
-	"openeyes/models"
+	//"openeyes/models"
 
 	"github.com/gin-gonic/gin"
 )
