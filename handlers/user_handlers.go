@@ -58,7 +58,7 @@ func LogoutHandler(c *gin.Context) {
 }
 
 func CreateUserHandler(c *gin.Context) {
-	user, err := authenticate(c)
+	user, err := Authenticate(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -90,7 +90,7 @@ func CreateUserHandler(c *gin.Context) {
 }
 
 func ResetPasswordHandler(c *gin.Context) {
-	user, err := authenticate(c)
+	user, err := Authenticate(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -123,7 +123,7 @@ func ResetPasswordHandler(c *gin.Context) {
 }
 
 func ChangePasswordHandler(c *gin.Context) {
-	user, err := authenticate(c)
+	user, err := Authenticate(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -162,7 +162,7 @@ func ChangePasswordHandler(c *gin.Context) {
 }
 
 func DeleteUserHandler(c *gin.Context) {
-	user, err := authenticate(c)
+	user, err := Authenticate(c)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
@@ -260,7 +260,7 @@ func generateRandomPassword() string {
 
 func GetAllUsersHandler(c *gin.Context) {
     // Cek autentikasi
-    user, err := authenticate(c)
+    user, err := Authenticate(c)
     if err != nil {
         c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
         return
