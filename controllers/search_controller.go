@@ -3,6 +3,7 @@ package controllers
 import (
 	"net/http"
 	"openeyes/services"
+	"openeyes/handlers"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,9 +19,9 @@ func NewSearchController(searchService *services.SearchService) *SearchControlle
 }
 
 func (c *SearchController) Search(ctx *gin.Context) {
-	_, exists := ctx.Get("userID")
-    if !exists {
-        ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+	user, err := handlers.authenticate(ctx)
+    if err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
         return
     }
 
