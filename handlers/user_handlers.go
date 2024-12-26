@@ -41,11 +41,33 @@ func LoginHandler(c *gin.Context) {
 	}
 
 	token := generateToken(user)
-	c.JSON(http.StatusOK, gin.H{"token": token})
+
+    _, err = db.Exec("UPDATE users SET jwt_token = ? WHERE id = ?", token, user.ID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update JWT token"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"token": token})
 }
 
 func LogoutHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+    user, err := authenticate(c)
+    if err != nil {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+        return
+    }
+
+    db := database.GetDB()
+
+    // Hapus token JWT dari database
+    _, err = db.Exec("UPDATE users SET jwt_token = NULL WHERE id = ?", user.ID)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to logout"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
 func CreateUserHandler(c *gin.Context) {
@@ -194,15 +216,15 @@ func authenticate(c *gin.Context) (models.User, error) {
 		return models.User{}, err
 	}
 
-	userID := uint(claims.(jwt.MapClaims)["id"].(float64))
 	var user models.User
-	db := database.GetDB()
-	err = db.QueryRow("SELECT id, username, role FROM users WHERE id = ?", userID).Scan(&user.ID, &user.Username, &user.Role)
-	if err != nil {
-		return models.User{}, err
-	}
+    err = db.QueryRow("SELECT id, username, role FROM users WHERE id = ? AND jwt_token = ?", userID, tokenString).Scan(&user.ID, &user.Username, &user.Role)
+    if err != nil {
+        // Token tidak cocok, logout pengguna dari perangkat sebelumnya
+        _, _ = db.Exec("UPDATE users SET jwt_token = NULL WHERE id = ?", userID)
+        return models.User{}, fmt.Errorf("Invalid token")
+    }
 
-	return user, nil
+    return user, nil
 }
 
 func generateToken(user models.User) string {
