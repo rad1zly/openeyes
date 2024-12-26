@@ -39,7 +39,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 func verifyToken(tokenString string) (jwt.Claims, error) {
     token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-        return []byte("your_secret_key"), nil
+        return []byte("abclimadasarapakahkamutahu"), nil
     })
 
     if err != nil {
