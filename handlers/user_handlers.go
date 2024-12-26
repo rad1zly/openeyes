@@ -75,8 +75,9 @@ func CreateUserHandler(c *gin.Context) {
 		return
 	}
 
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(newUser.Password), bcrypt.DefaultCost)
+	
 	newUser.Password = generateRandomPassword()
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(newUser.Password), bcrypt.DefaultCost)
 	newUser.Role = "user"
 		
 	db := database.GetDB()
