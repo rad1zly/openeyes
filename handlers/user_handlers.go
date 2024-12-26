@@ -76,9 +76,9 @@ func CreateUserHandler(c *gin.Context) {
 	}
 
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(newUser.Password), bcrypt.DefaultCost)
-	newUser.Password = string(hashedPassword)
+	newUser.Password = generateRandomPassword()
 	newUser.Role = "user"
-
+	
 	db := database.GetDB()
 	_, err = db.Exec("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", newUser.Username, newUser.Password, newUser.Role)
 	if err != nil {
@@ -86,7 +86,7 @@ func CreateUserHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "User created successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "User created successfully", "tempPassword": newUser.Password})
 }
 
 func ResetPasswordHandler(c *gin.Context) {
