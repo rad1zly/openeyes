@@ -42,6 +42,7 @@ func LoginHandler(c *gin.Context) {
 
 	token := generateToken(user)
 
+    // Perbarui token JWT di database, bahkan jika pengguna sudah memiliki token sebelumnya
     _, err = db.Exec("UPDATE users SET jwt_token = ? WHERE id = ?", token, user.ID)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update JWT token"})
@@ -52,21 +53,7 @@ func LoginHandler(c *gin.Context) {
 }
 
 func LogoutHandler(c *gin.Context) {
-    user, err := authenticate(c)
-    if err != nil {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-        return
-    }
-
-    db := database.GetDB()
-
-    // Hapus token JWT dari database
-    _, err = db.Exec("UPDATE users SET jwt_token = NULL WHERE id = ?", user.ID)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to logout"})
-        return
-    }
-
+    // Tidak perlu melakukan apa pun dalam logout handler
     c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
