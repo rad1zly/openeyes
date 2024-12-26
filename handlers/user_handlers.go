@@ -191,7 +191,7 @@ func DeleteUserHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
 }
 
-func authenticate(c *gin.Context) (models.User, error) {
+func Authenticate(c *gin.Context) (models.User, error) {
     tokenString := c.GetHeader("Authorization")
     if tokenString == "" {
         return models.User{}, fmt.Errorf("No token provided")

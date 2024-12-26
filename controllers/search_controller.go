@@ -4,10 +4,12 @@ import (
 	"net/http"
 	"openeyes/services"
 	"openeyes/handlers"
+	"openeyes/models"
 
 	"github.com/gin-gonic/gin"
 )
 
+var user models.user
 type SearchController struct {
 	searchService *services.SearchService
 }
@@ -18,10 +20,10 @@ func NewSearchController(searchService *services.SearchService) *SearchControlle
 	}
 }
 
-func (c *SearchController) Search(ctx *gin.Context)(handlers.authenticate, error) {
-	_, err := authenticate(ctx)
+func (c *SearchController) Search(ctx *gin.Context) {
+	user, err := handlers.Authenticate(ctx)
     if err != nil {
-        ctx.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+        c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
         return
     }
 
