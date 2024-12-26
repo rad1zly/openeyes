@@ -10,12 +10,6 @@ import (
 
 func AuthMiddleware() gin.HandlerFunc {
     return func(c *gin.Context) {
-        // Skip middleware untuk endpoint login
-        if c.FullPath() == "/api/login" {
-            c.Next()
-            return
-        }
-
         tokenString := c.GetHeader("Authorization")
         if tokenString == "" {
             c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization token not provided"})
@@ -24,6 +18,8 @@ func AuthMiddleware() gin.HandlerFunc {
         }
 
         tokenString = strings.Replace(tokenString, "Bearer ", "", 1)
+
+        // Verifikasi token JWT
         claims, err := verifyToken(tokenString)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
@@ -31,8 +27,22 @@ func AuthMiddleware() gin.HandlerFunc {
             return
         }
 
+        // Ambil user ID dari klaim token
         userID := uint(claims.(jwt.MapClaims)["id"].(float64))
-        c.Set("userID", userID)
+
+        // Periksa kecocokan token JWT dengan yang ada di database
+        db := database.GetDB()
+        var user models.User
+        err = db.QueryRow("SELECT id, username, role FROM users WHERE id = ? AND jwt_token = ?", userID, tokenString).Scan(&user.ID, &user.Username, &user.Role)
+        if err != nil {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+            c.Abort()
+            return
+        }
+
+        // Set informasi pengguna ke konteks Gin
+        c.Set("user", user)
+
         c.Next()
     }
 }
