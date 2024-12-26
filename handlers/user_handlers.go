@@ -75,18 +75,18 @@ func CreateUserHandler(c *gin.Context) {
 		return
 	}
 
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(newUser.Password), bcrypt.DefaultCost)
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(tempPassword), bcrypt.DefaultCost)
 	newUser.Password = generateRandomPassword()
 	newUser.Role = "user"
-	
+		
 	db := database.GetDB()
-	_, err = db.Exec("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", newUser.Username, newUser.Password, newUser.Role)
+	_, err = db.Exec("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", newUser.Username, string(hashedPassword), newUser.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "User created successfully", "tempPassword": newUser.Password})
+	c.JSON(http.StatusOK, gin.H{"message": "User created successfully", "tempPassword":newUser.Password})
 }
 
 func ResetPasswordHandler(c *gin.Context) {
