@@ -25,7 +25,7 @@ func (c *SearchController) Search(ctx *gin.Context) {
     }
 
 	query := ctx.Query("q")
-	if query == "q" {
+	if query == "" {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Query parameter is required"})
 		return
 	}
