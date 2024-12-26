@@ -205,22 +205,22 @@ func DeleteUserHandler(c *gin.Context) {
 }
 
 func authenticate(c *gin.Context) (models.User, error) {
-	tokenString := c.GetHeader("Authorization")
-	if tokenString == "" {
-		return models.User{}, fmt.Errorf("No token provided")
-	}
+    tokenString := c.GetHeader("Authorization")
+    if tokenString == "" {
+        return models.User{}, fmt.Errorf("No token provided")
+    }
 
-	tokenString = strings.Replace(tokenString, "Bearer ", "", 1)
-	claims, err := verifyToken(tokenString)
-	if err != nil {
-		return models.User{}, err
-	}
-
-	var user models.User
-    err = db.QueryRow("SELECT id, username, role FROM users WHERE id = ? AND jwt_token = ?", userID, tokenString).Scan(&user.ID, &user.Username, &user.Role)
+    tokenString = strings.Replace(tokenString, "Bearer ", "", 1)
+    claims, err := verifyToken(tokenString)
     if err != nil {
-        // Token tidak cocok, logout pengguna dari perangkat sebelumnya
-        _, _ = db.Exec("UPDATE users SET jwt_token = NULL WHERE id = ?", userID)
+        return models.User{}, err
+    }
+
+    userID := uint(claims.(jwt.MapClaims)["id"].(float64))
+    var user models.User
+    db := database.GetDB()
+    err = db.QueryRow("SELECT id, username, role FROM users WHERE id = ?", userID).Scan(&user.ID, &user.Username, &user.Role)
+    if err != nil {
         return models.User{}, fmt.Errorf("Invalid token")
     }
 
@@ -240,15 +240,22 @@ func generateToken(user models.User) string {
 }
 
 func verifyToken(tokenString string) (jwt.Claims, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
-	})
+    token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+        if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+            return nil, fmt.Errorf("Invalid token")
+        }
+        return jwtSecret, nil
+    })
 
-	if err != nil {
-		return nil, err
-	}
+    if err != nil {
+        return nil, err
+    }
 
-	return token.Claims, nil
+    if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+        return claims, nil
+    }
+
+    return nil, fmt.Errorf("Invalid token")
 }
 
 func generateRandomPassword() string {
