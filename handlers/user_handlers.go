@@ -80,7 +80,7 @@ func CreateUserHandler(c *gin.Context) {
 	newUser.Role = "user"
 		
 	db := database.GetDB()
-	_, err = db.Exec("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", newUser.Username, string(hashedPassword), newUser.Role)
+	_, err = db.Exec("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", newUser.Username, hashedPassword, newUser.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
 		return
