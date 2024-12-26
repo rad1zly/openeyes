@@ -3,6 +3,8 @@ package middleware
 import (
     "net/http"
     "strings"
+	"openeyes/database"
+	"openeyes/models"
 
     "github.com/dgrijalva/jwt-go"
     "github.com/gin-gonic/gin"
