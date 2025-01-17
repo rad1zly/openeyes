@@ -24,83 +24,87 @@ func NewSearchService(cfg *config.Config) *SearchService {
 
 func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
     response := &models.SearchResponse{Query: query}
-
-    searchType := "name"
-    if isNIK(query) {
-        searchType = "nik"
-    } else if isPhone(query) {
-        searchType = "phone"
-    }
+    searchType := s.determineQueryType(query)
 
     // Cari di ELK dulu
     elkResults, _ := s.searchElk(query, searchType)
-    if len(elkResults) > 0 {
-        fmt.Printf("\n🔍 Data ditemukan di ELK\n")
-        
-        // Pisahkan hasil sesuai sumber
-        for _, result := range elkResults {
-            switch result.Source {
-            case "leakosint":
-                response.LeakosintResults = append(response.LeakosintResults, result)
-            case "linkedin":
-                response.LinkedinResults = append(response.LinkedinResults, result)
-            case "truecaller":
-                response.TruecallerResults = append(response.TruecallerResults, result)
+
+    if searchType == "name" {
+        // Jika dapat hasil dari ELK, masukkan ke response
+        if len(elkResults) > 0 {
+            for _, result := range elkResults {
+                if result.Source == "leakosint" {
+                    response.LeakosintResults = append(response.LeakosintResults, result)
+                } else if result.Source == "linkedin" {
+                    response.LinkedinResults = append(response.LinkedinResults, result)
+                }
             }
         }
-        return response, nil
-    }
 
-    fmt.Printf("\n🔄 Data tidak ditemukan di ELK, mencari di API eksternal...\n")
-
-    // Jika tidak ada di ELK, cari di API eksternal
-    if !isNIK(query) && !isPhone(query) {
-        // Pencarian nama - cari di Leakosint dan LinkedIn
+        // Tetap cari di API
         leakResults, _ := s.searchLeakosint(query)
         if len(leakResults) > 0 {
-            fmt.Printf("✅ Data ditemukan di Leakosint API\n")
+            response.LeakosintResults = append(response.LeakosintResults, leakResults...)
+            // Save hasil baru ke ELK
             for _, result := range leakResults {
                 s.saveToElk(result, "name")
             }
-            response.LeakosintResults = leakResults
         }
 
         linkResults, _ := s.searchLinkedin(query)
         if len(linkResults) > 0 {
-            fmt.Printf("✅ Data ditemukan di LinkedIn API\n")
+            response.LinkedinResults = append(response.LinkedinResults, linkResults...)
+            // Save hasil baru ke ELK
             for _, result := range linkResults {
                 s.saveToElk(result, "name")
             }
-            response.LinkedinResults = linkResults
         }
-    } else if isNIK(query) {
-        // Pencarian NIK - cari di Leakosint
-        leakResults, _ := s.searchLeakosint(query)
-        if len(leakResults) > 0 {
-            fmt.Printf("✅ Data ditemukan di Leakosint API\n")
-            for _, result := range leakResults {
-                s.saveToElk(result, "nik")
+
+    } else if searchType == "phone" {
+        // Jika dapat hasil dari ELK, masukkan ke response
+        if len(elkResults) > 0 {
+            for _, result := range elkResults {
+                if result.Source == "leakosint" {
+                    response.LeakosintResults = append(response.LeakosintResults, result)
+                } else if result.Source == "truecaller" {
+                    response.TruecallerResults = append(response.TruecallerResults, result)
+                }
             }
-            response.LeakosintResults = leakResults
         }
-    } else if isPhone(query) {
-        // Pencarian phone - cari di Leakosint dan Truecaller
+
+        // Tetap cari di API
         leakResults, _ := s.searchLeakosint(query)
         if len(leakResults) > 0 {
-            fmt.Printf("✅ Data ditemukan di Leakosint API\n")
+            response.LeakosintResults = append(response.LeakosintResults, leakResults...)
+            // Save hasil baru ke ELK
             for _, result := range leakResults {
                 s.saveToElk(result, "phone")
             }
-            response.LeakosintResults = leakResults
         }
 
         trueResults, _ := s.searchTruecaller(query)
         if len(trueResults) > 0 {
-            fmt.Printf("✅ Data ditemukan di Truecaller API\n")
+            response.TruecallerResults = append(response.TruecallerResults, trueResults...)
+            // Save hasil baru ke ELK
             for _, result := range trueResults {
                 s.saveToElk(result, "phone")
             }
-            response.TruecallerResults = trueResults
+        }
+
+    } else if searchType == "nik" {
+        // Untuk NIK, tetap gunakan flow yang lama
+        if len(elkResults) > 0 {
+            response.LeakosintResults = elkResults
+            return response, nil
+        }
+
+        leakResults, _ := s.searchLeakosint(query)
+        if len(leakResults) > 0 {
+            response.LeakosintResults = leakResults
+            // Save ke ELK
+            for _, result := range leakResults {
+                s.saveToElk(result, "nik")
+            }
         }
     }
 
