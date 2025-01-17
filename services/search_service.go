@@ -30,69 +30,82 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
     elkResults, _ := s.searchElk(query, searchType)
 
     if searchType == "name" {
-        // Jika dapat hasil dari ELK, masukkan ke response
+        var hasLeakosintData, hasLinkedinData bool
+
+        // Cek hasil dari ELK dan masukkan ke response
         if len(elkResults) > 0 {
             for _, result := range elkResults {
                 if result.Source == "leakosint" {
+                    hasLeakosintData = true
                     response.LeakosintResults = append(response.LeakosintResults, result)
                 } else if result.Source == "linkedin" {
+                    hasLinkedinData = true
                     response.LinkedinResults = append(response.LinkedinResults, result)
                 }
             }
         }
 
-        // Tetap cari di API
-        leakResults, _ := s.searchLeakosint(query)
-        if len(leakResults) > 0 {
-            response.LeakosintResults = append(response.LeakosintResults, leakResults...)
-            // Save hasil baru ke ELK
-            for _, result := range leakResults {
-                s.saveToElk(result, "name")
+        // Cari di API hanya jika data belum lengkap
+        if !hasLeakosintData {
+            leakResults, _ := s.searchLeakosint(query)
+            if len(leakResults) > 0 {
+                response.LeakosintResults = append(response.LeakosintResults, leakResults...)
+                // Save hasil baru ke ELK
+                for _, result := range leakResults {
+                    s.saveToElk(result, "name")
+                }
             }
         }
 
-        linkResults, _ := s.searchLinkedin(query)
-        if len(linkResults) > 0 {
-            response.LinkedinResults = append(response.LinkedinResults, linkResults...)
-            // Save hasil baru ke ELK
-            for _, result := range linkResults {
-                s.saveToElk(result, "name")
+        if !hasLinkedinData {
+            linkResults, _ := s.searchLinkedin(query)
+            if len(linkResults) > 0 {
+                response.LinkedinResults = append(response.LinkedinResults, linkResults...)
+                // Save hasil baru ke ELK
+                for _, result := range linkResults {
+                    s.saveToElk(result, "name")
+                }
             }
         }
 
     } else if searchType == "phone" {
-        // Jika dapat hasil dari ELK, masukkan ke response
+        var hasLeakosintData, hasTruecallerData bool
+
+        // Cek hasil dari ELK dan masukkan ke response
         if len(elkResults) > 0 {
             for _, result := range elkResults {
                 if result.Source == "leakosint" {
+                    hasLeakosintData = true
                     response.LeakosintResults = append(response.LeakosintResults, result)
                 } else if result.Source == "truecaller" {
+                    hasTruecallerData = true
                     response.TruecallerResults = append(response.TruecallerResults, result)
                 }
             }
         }
 
-        // Tetap cari di API
-        leakResults, _ := s.searchLeakosint(query)
-        if len(leakResults) > 0 {
-            response.LeakosintResults = append(response.LeakosintResults, leakResults...)
-            // Save hasil baru ke ELK
-            for _, result := range leakResults {
-                s.saveToElk(result, "phone")
+        // Cari di API hanya jika data belum lengkap
+        if !hasLeakosintData {
+            leakResults, _ := s.searchLeakosint(query)
+            if len(leakResults) > 0 {
+                response.LeakosintResults = append(response.LeakosintResults, leakResults...)
+                for _, result := range leakResults {
+                    s.saveToElk(result, "phone")
+                }
             }
         }
 
-        trueResults, _ := s.searchTruecaller(query)
-        if len(trueResults) > 0 {
-            response.TruecallerResults = append(response.TruecallerResults, trueResults...)
-            // Save hasil baru ke ELK
-            for _, result := range trueResults {
-                s.saveToElk(result, "phone")
+        if !hasTruecallerData {
+            trueResults, _ := s.searchTruecaller(query)
+            if len(trueResults) > 0 {
+                response.TruecallerResults = append(response.TruecallerResults, trueResults...)
+                for _, result := range trueResults {
+                    s.saveToElk(result, "phone")
+                }
             }
         }
-
     } else if searchType == "nik" {
-        // Untuk NIK, tetap gunakan flow yang lama
+        // Untuk NIK tetap gunakan flow yang lama
         if len(elkResults) > 0 {
             response.LeakosintResults = elkResults
             return response, nil
@@ -101,7 +114,6 @@ func (s *SearchService) Search(query string) (*models.SearchResponse, error) {
         leakResults, _ := s.searchLeakosint(query)
         if len(leakResults) > 0 {
             response.LeakosintResults = leakResults
-            // Save ke ELK
             for _, result := range leakResults {
                 s.saveToElk(result, "nik")
             }
