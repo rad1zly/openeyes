@@ -176,79 +176,53 @@ func (s *SearchService) queryLeakosintAPI(query string) (models.LeakosintRespons
 }
 
 func (s *SearchService) searchLinkedin(query string) ([]models.SearchResult, error) {
-    data := map[string]interface{}{
-        "name": query,
+    reqBody := map[string]interface{}{
+        "name":         query,
         "company_name": "",
-        "job_title": "",
-        "location": "",
-        "keywords": "",
-        "limit": 15,
+        "job_title":    "",
+        "location":     "",
+        "keywords":     "",
+        "limit":        15,
     }
- 
-    jsonData, _ := json.Marshal(data)
+
+    jsonData, err := json.Marshal(reqBody)
+    if err != nil {
+        return nil, err
+    }
+
     fmt.Printf("LinkedIn Request: %s\n", string(jsonData))
- 
-    req, _ := http.NewRequest("POST", s.config.LinkedinURL, bytes.NewBuffer(jsonData))
+
+    req, err := http.NewRequest("POST", s.config.LinkedinURL, bytes.NewBuffer(jsonData))
+    if err != nil {
+        return nil, err
+    }
+
     req.Header.Set("Content-Type", "application/json")
     req.Header.Set("x-rapidapi-key", s.config.LinkedinAPIKey)
     req.Header.Set("x-rapidapi-host", s.config.LinkedinAPIHost)
- 
-    client := &http.Client{}
-    resp, err := client.Do(req)
-    if err != nil {
-        fmt.Printf("LinkedIn Error: %v\n", err)
-        return nil, err
-    }
-    defer resp.Body.Close()
- 
-    body, _ := ioutil.ReadAll(resp.Body)
-    fmt.Printf("LinkedIn Response: %s\n", string(body))
- 
-    var apiResponse []interface{}
-    if err := json.Unmarshal(body, &apiResponse); err != nil {
-        fmt.Printf("LinkedIn Parse Error: %v\n", err)
-        return nil, err
-    }
- 
-    var results []models.SearchResult
-    for _, data := range apiResponse {
-        results = append(results, models.SearchResult{
-            ID:        fmt.Sprintf("linkedin_%d", time.Now().UnixNano()),
-            Source:    "linkedin",
-            Data:      data,
-            Timestamp: time.Now(),
-        })
-    }
- 
-    return results, nil
- }
-
-func (s *SearchService) searchTruecaller(query string) ([]models.SearchResult, error) {
-    url := fmt.Sprintf("%s/%s", s.config.TruecallerURL, query)
-    
-    req, err := http.NewRequest("GET", url, nil)
-    if err != nil {
-        return nil, fmt.Errorf("error creating request: %v", err)
-    }
-
-    req.Header.Add("x-rapidapi-key", s.config.TruecallerAPIKey)
-    req.Header.Add("x-rapidapi-host", s.config.TruecallerAPIHost)
 
     client := &http.Client{Timeout: time.Second * 10}
     resp, err := client.Do(req)
     if err != nil {
-        return nil, fmt.Errorf("error making request: %v", err)
+        return nil, err
     }
     defer resp.Body.Close()
 
-    var truecallerResp models.TruecallerResponse
-    if err := json.NewDecoder(resp.Body).Decode(&truecallerResp); err != nil {
-        return nil, fmt.Errorf("error decoding response: %v", err)
+    body, err := ioutil.ReadAll(resp.Body)
+    fmt.Printf("LinkedIn Response: %s\n", string(body))
+
+    // Parse response sebagai map dulu
+    var responseData map[string]interface{}
+    if err := json.Unmarshal(body, &responseData); err != nil {
+        fmt.Printf("LinkedIn Parse Error: %v\n", err)
+        return nil, err
     }
 
+    // Convert ke SearchResult
     result := models.SearchResult{
-        Source:    "truecaller",
-        Data:     truecallerResp.Data,
+        ID:        fmt.Sprintf("linkedin_%d", time.Now().UnixNano()),
+        Source:    "linkedin",
+        Data:      responseData,
         Timestamp: time.Now(),
     }
 
