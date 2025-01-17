@@ -229,6 +229,38 @@ func (s *SearchService) searchLinkedin(query string) ([]models.SearchResult, err
     return []models.SearchResult{result}, nil
 }
 
+func (s *SearchService) searchTruecaller(query string) ([]models.SearchResult, error) {
+    url := fmt.Sprintf("%s/%s", s.config.TruecallerURL, query)
+    
+    req, err := http.NewRequest("GET", url, nil)
+    if err != nil {
+        return nil, fmt.Errorf("error creating request: %v", err)
+    }
+
+    req.Header.Add("x-rapidapi-key", s.config.TruecallerAPIKey)
+    req.Header.Add("x-rapidapi-host", s.config.TruecallerAPIHost)
+
+    client := &http.Client{Timeout: time.Second * 10}
+    resp, err := client.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("error making request: %v", err)
+    }
+    defer resp.Body.Close()
+
+    var truecallerResp models.TruecallerResponse
+    if err := json.NewDecoder(resp.Body).Decode(&truecallerResp); err != nil {
+        return nil, fmt.Errorf("error decoding response: %v", err)
+    }
+
+    result := models.SearchResult{
+        Source:    "truecaller",
+        Data:     truecallerResp.Data,
+        Timestamp: time.Now(),
+    }
+
+    return []models.SearchResult{result}, nil
+}
+
 func (s *SearchService) determineQueryType(query string) string {
     if isNIK(query) {
         return "nik"
